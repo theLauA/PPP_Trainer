@@ -38,10 +38,11 @@ for filename in files:
 		keypoints_ls = np.array(keypoints_ls)
 		
 		keypoints_ls_normalize = normalize_coor(keypoints_ls[:,:2])
+		plt.figure(figsize=(3,8))	
 		for pair in keypoints_pairs:
 			k, l = pair
 			if(keypoints_ls[k,2] > 0 and keypoints_ls[l,2] > 0):
 				print(k,l,keypoints_ls_normalize[k,:2],keypoints_ls_normalize[l,:2])
 				plt.plot([keypoints_ls_normalize[k,0],keypoints_ls_normalize[l,0]],[keypoints_ls_normalize[k,1],keypoints_ls_normalize[l,1]])
-				
+		
 		plt.show()
