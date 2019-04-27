@@ -32,8 +32,26 @@ def plot(keypoints):
 
     plt.show()
 
-
-def get_specific_point(body_points_arrays, num):
+def plots(keypoints_lists):
+    keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
+                       [1, 2], [1, 5], [1, 8],
+                       [2, 3], [3, 4],
+                       [5, 6], [6, 7],
+                       [8, 9], [8, 12],
+                       [9, 10], [10, 11], [11, 22], [11, 24], [22, 23],
+                       [12, 13], [13, 14], [14, 19], [14, 21], [19, 20]]
+    keypoints_pairs = np.array(keypoints_pairs)
+    N = len(keypoints_lists) 
+    for i in range(N):
+        #ax = plt.subplot(1,N,i+1)
+        #plt.setp(ax,yticks=range(-200,60,40))
+        for pair in keypoints_pairs:
+            k,l = pair
+            if(keypoints_lists[i][k*3+2]>0 and keypoints_lists[i][l*3+2]>0):
+                plt.plot([-keypoints_lists[i][k*3],-keypoints_lists[i][l*3]],
+                        [-keypoints_lists[i][k*3+1],-keypoints_lists[i][l*3+1]])
+    plt.show()
+def get_body_point(body_points_arrays, num):
     return body_points_arrays[num * 3], body_points_arrays[num * 3 + 1]
 
 
@@ -165,9 +183,10 @@ for line_video_list in lines_video_list:  # for each video
         lol = get_body_points(action_frames, focus_2ppl=ppl_focus)
         print "lol length: ", len(lol)
         lol = centering(lol)
+        old_lol = np.array(lol)
         lol = normalize(lol)
-        if video_name == "101-1":
-            for lnl in lol:
-                plot(lnl)
+        for idx,lnl in enumerate(lol):
+            #plot(lnl)
+            plots( [lnl,old_lol[idx]] )
         # features.append("")
         labels.append(video_name[0])
