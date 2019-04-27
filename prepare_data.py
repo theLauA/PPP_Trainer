@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import skimage as sk
 from skimage import transform
 import random
+from features import _extract_features_
 
 def plot(keypoints):
     keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
@@ -230,31 +231,36 @@ for line_video_list in lines_video_list:  # for each video
         N, K, dim = points.shape
         
         window = 20
-        step = window/2
-        n_feature_keypoint = 0
-        features = np.zeros(K*n_feature_keypoint)
+        step = 5
+        n_feature_keypoint = 13
+        
         for w in range(0,N,step):
             current_window = points[w:w+window,:,:]
+            current_features = np.zeros(K*n_feature_keypoint)
             
-            #random_degree = random.uniform(-25, 25)
-            #jittered = sk.transform.rotate(np.array(current_window[0,:,:2]), random_degree)
-        
-            #print(jittered)
-            #plot_jittered(jittered,current_window[0,:,1])
-
             n,nx,ny = current_window.shape
             if n < 10:
                 break
+            
             for i in range(K):
                 #Get Specific points over the Window
                 point_time_series = current_window[:,i,:].reshape(n,ny)
                 #Remove Invalid points and Drop Probability
                 point_time_series = point_time_series[point_time_series[:,2]>0]
                 point_time_series = point_time_series[:,0:2]
+
                 if point_time_series.shape[0] < 10:
                     #Just Leave features as Zeros for such keypoint
                     break
-            
-                
-        
-        labels.append(video_name[0])
+
+                #print(point_time_series.shape)
+                current_features[i*n_feature_keypoint:i*n_feature_keypoint+n_feature_keypoint] = _extract_features_(point_time_series)
+
+            features.append(current_features)        
+            labels.append(int(video_name[0]))
+
+features = np.array(features)
+labels = np.array(labels)
+print(features[0])
+print(features.shape, labels.shape)
+np.savetxt("features.csv", np.append(features,labels[:,np.newaxis],axis=1), delimiter=",")

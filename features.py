@@ -2,9 +2,17 @@ import numpy as np
 from scipy.stats import linregress
 
 #Expect Time Serie Points in shape [T,2]
-def _extract_features(points):
+def _extract_features_(points):
 
-    return
+    result = np.zeros((1,0))
+    result = np.append(result,_mean_(points))
+    result = np.append(result,_mins_(points))
+    result = np.append(result,_maxs_(points))
+    result = np.append(result,_median_(points))
+    result = np.append(result,_regress_(points))
+
+    
+    return result
 
 
 def _mean_(points):
