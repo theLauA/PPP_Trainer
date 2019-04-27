@@ -43,13 +43,14 @@ def plots(keypoints_lists):
     keypoints_pairs = np.array(keypoints_pairs)
     N = len(keypoints_lists) 
     for i in range(N):
-        #ax = plt.subplot(1,N,i+1)
-        #plt.setp(ax,yticks=range(-200,60,40))
+        ax = plt.subplot(1,N,i+1)
+        
         for pair in keypoints_pairs:
             k,l = pair
             if(keypoints_lists[i][k*3+2]>0 and keypoints_lists[i][l*3+2]>0):
-                plt.plot([-keypoints_lists[i][k*3],-keypoints_lists[i][l*3]],
+                ax.plot([-keypoints_lists[i][k*3],-keypoints_lists[i][l*3]],
                         [-keypoints_lists[i][k*3+1],-keypoints_lists[i][l*3+1]])
+        ax.set_yticks(range(-200,60,40))
     plt.show()
 def get_body_point(body_points_arrays, num):
     return body_points_arrays[num * 3], body_points_arrays[num * 3 + 1]
@@ -142,6 +143,15 @@ def normalize(body_points_arrays):
 
 # def normalize_body_size(body_points_arrays, ideal_neck_size=20):
 
+#Change flat keypoints shape
+def normalize_range(keypoints):
+    keypoints_ls = []
+    for idx in range(0, len(keypoints), 3):
+        keypoints_ls.append([-keypoints[idx], -keypoints[idx + 1], keypoints[idx + 2]])
+    keypoints_ls = np.array(keypoints_ls)
+    maxs = np.max(keypoints_ls,axis=0,keepdims=True)
+    mins = np.min(keypoints_ls,axis=0,keepdims=True)
+    return (keypoints_ls - mins)/(maxs-mins)
 
 data_path = './data/'
 
@@ -185,8 +195,9 @@ for line_video_list in lines_video_list:  # for each video
         lol = centering(lol)
         old_lol = np.array(lol)
         lol = normalize(lol)
+        
         for idx,lnl in enumerate(lol):
-            #plot(lnl)
-            plots( [lnl,old_lol[idx]] )
-        # features.append("")
+            #plots( [lnl,old_lol[idx]] )
+            points = normalize_range(lnl)
+            
         labels.append(video_name[0])
