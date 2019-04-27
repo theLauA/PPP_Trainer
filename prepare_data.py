@@ -153,6 +153,8 @@ def normalize_range(keypoints):
     mins = np.min(keypoints_ls,axis=0,keepdims=True)
     return (keypoints_ls - mins)/(maxs-mins)
 
+
+########################Main Code Begin##############################################################
 data_path = './data/'
 
 lines_video_list = open(data_path + "video_list.csv", "r").readlines()
@@ -201,5 +203,28 @@ for line_video_list in lines_video_list:  # for each video
             #plots( [lnl,old_lol[idx]] )
             points.append(normalize_range(lnl))
         points = np.array(points)
-        print(points.shape)
+        
+        N, K, dim = points.shape
+        
+        window = 20
+        step = window/2
+        n_feature_keypoint = 0
+        features = np.zeros(K*n_feature_keypoint)
+        for w in range(0,N,step):
+            current_window = points[w:w+window,:,:]
+            n,nx,ny = current_window.shape
+            if n < 10:
+                break
+            for i in range(K):
+                #Get Specific points over the Window
+                point_time_series = current_window[:,i,:].reshape(n,ny)
+                #Remove Invalid points and Drop Probability
+                point_time_series = point_time_series[point_time_series[:,2]>0]
+                point_time_series = point_time_series[:,0:2]
+                if point_time_series.shape[0] < 10:
+                    #Just Leave features as Zeros for such keypoint
+                    break
+            
+                
+        
         labels.append(video_name[0])
