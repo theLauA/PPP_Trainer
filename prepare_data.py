@@ -1,34 +1,46 @@
 import os
 import json
 import math
+import copy
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot(keypoints):
+    keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
+                       [1, 2], [1, 5], [1, 8],
+                       [2, 3], [3, 4],
+                       [5, 6], [6, 7],
+                       [8, 9], [8, 12],
+                       [9, 10], [10, 11], [11, 22], [11, 24], [22, 23],
+                       [12, 13], [13, 14], [14, 19], [14, 21], [19, 20]]
+    keypoints_pairs = np.array(keypoints_pairs)
+    count = 0
+    keypoints_ls = []
+    for idx in range(0, len(keypoints), 3):
+        keypoints_ls.append([-keypoints[idx], -keypoints[idx + 1], keypoints[idx + 2]])
+
+    keypoints_ls = np.array(keypoints_ls)
+    keypoints_ls_normalize = keypoints_ls
+    plt.figure(figsize=(3, 8))
+    plt.yticks([-200, -180, -160, -140, -120, -100, -80, -60, -40, -20, 0, 20, 40])
+    for pair in keypoints_pairs:
+        k, l = pair
+        if (keypoints_ls[k, 2] > 0 and keypoints_ls[l, 2] > 0):
+            #print(k, l, keypoints_ls_normalize[k, :2], keypoints_ls_normalize[l, :2])
+            plt.plot([keypoints_ls_normalize[k, 0], keypoints_ls_normalize[l, 0]],
+                     [keypoints_ls_normalize[k, 1], keypoints_ls_normalize[l, 1]])
+
+    plt.show()
+
 
 def get_body_point(body_points_arrays, num):
     return body_points_arrays[num * 3], body_points_arrays[num * 3 + 1]
+
 
 def write_body_point(body_points_arrays, num, point_x, point_y):
     body_points_arrays[int(num) * 3] = point_x
     body_points_arrays[int(num) * 3 + 1] = point_y
     return body_points_arrays
-
-
-def normalize(body_points_arrays):
-    temp_array = copy.deepcopy(body_points_arrays)
-    ideal_neck_length = 50.0
-    nose_x, nose_y = get_body_point(body_points_arrays, 0)
-    neck_x, neck_y = get_body_point(body_points_arrays, 1)
-    print "nose: ", nose_x, " - ", nose_y
-    print "neck: ", neck_x, " - ", neck_y
-    neck_length = distance(nose_x, nose_y, neck_x, neck_y)
-    ratio_to_divide = neck_length / ideal_neck_length
-
-    for i in range(0, 25):
-        point_x, point_y = get_body_point(body_points_arrays, i)
-        angle_with_neck = angle(nose_x, nose_y, point_x, point_y)
-        distance_with_neck = distance(nose_x, nose_y, point_x, point_y)
-        x = nose_x + distance_with_neck/ratio_to_divide * math.cos(angle_with_neck)
-        y = nose_y + distance_with_neck/ratio_to_divide * math.sin(angle_with_neck)
-        temp_array = write_body_point(temp_array, i, x, y)
-    return temp_array
 
 
 def angle(center_x, center_y, touch_x, touch_y):
@@ -41,15 +53,17 @@ def angle(center_x, center_y, touch_x, touch_y):
 def distance(center_x, center_y, touch_x, touch_y):
     return ((center_x - touch_x) ** 2 + (center_y - touch_y) ** 2) ** 0.5
 
+
 def get_body_points(filenames, focus_2ppl="none"):
     body_points_all_frame = []
     for filename in filenames:
-        data = json.load(open(filename,"r"))  # read json files
+        data = json.load(open(filename, "r"))  # read json files
         if focus_2ppl == "none":  # in case of 1ppl
             body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
-        else:   # in case of 2ppl
+        else:  # in case of 2ppl
             left_ppl, right_ppl = None, None
-            if data['people'][0]["pose_keypoints_2d"][0] > data['people'][1]["pose_keypoints_2d"][0]:  # compare nose's x values to see which is left
+            if data['people'][0]["pose_keypoints_2d"][0] > data['people'][1]["pose_keypoints_2d"][
+                0]:  # compare nose's x values to see which is left
                 left_ppl = data['people'][1]["pose_keypoints_2d"]
                 right_ppl = data['people'][0]["pose_keypoints_2d"]
             else:
@@ -58,17 +72,45 @@ def get_body_points(filenames, focus_2ppl="none"):
             body_points_all_frame.append(left_ppl) if focus_2ppl == "left" else body_points_all_frame.append(right_ppl)
     return body_points_all_frame
 
+
 # centering with respect nose
 def centering(body_points_arrays):
     for body_points_array in body_points_arrays:  # for each body points array
         nose_x = body_points_array[0]
         nose_y = body_points_array[1]
-        for i in range(0, 9):
-            body_points_array[i*2] -= nose_x
-            body_points_array[i*2+1] -= nose_y
+        for i in range(0, 25):
+            body_points_array[i * 3] -= nose_x
+            body_points_array[i * 3 + 1] -= nose_y
     return body_points_arrays
 
-#def normalize_body_size(body_points_arrays, ideal_neck_size=20):
+
+def normalize(body_points_arrays):
+    ideal_neck_length = 50.0
+    longest_neck = -1
+    for body_points_array in body_points_arrays:  # find the longest neck among all frames
+        nose_x, nose_y = get_body_point(body_points_array,0)
+        neck_x, neck_y = get_body_point(body_points_array,1)
+        neck_length = distance(nose_x,nose_y, neck_x, neck_y)
+        if neck_length > longest_neck:
+            longest_neck = neck_length
+    ratio_to_divide = longest_neck / ideal_neck_length
+
+    normalized = []
+    for body_points_array in body_points_arrays: # normalize each body points array
+        temp_array = copy.deepcopy(body_points_array)
+        nose_x, nose_y = get_body_point(body_points_array, 0)
+        for i in range(0, 25):
+            point_x, point_y = get_body_point(body_points_array, i)
+            angle_with_neck = angle(nose_x, nose_y, point_x, point_y)
+            distance_with_neck = distance(nose_x, nose_y, point_x, point_y)
+            x = nose_x + distance_with_neck / ratio_to_divide * math.cos(angle_with_neck)
+            y = nose_y + distance_with_neck / ratio_to_divide * math.sin(angle_with_neck)
+            temp_array = write_body_point(temp_array, i, x, y)
+        normalized.append(temp_array)
+    return normalized
+
+
+# def normalize_body_size(body_points_arrays, ideal_neck_size=20):
 
 
 data_path = './data/'
@@ -99,8 +141,10 @@ for line_video_list in lines_video_list:  # for each video
     lines_frame_range = open(path_frame_range, "r").readlines()
 
     for line_frame_range in lines_frame_range:  # for each action (frame range)
+
         frame_start = line_frame_range.rstrip('\n').split(",")[0]
         frame_end = line_frame_range.rstrip('\n').split(",")[1]
+        print "frame start: ", frame_start, " - frame_end: ",frame_end
         action_frames = []
         for curr_json in all_json_files:
             if int(frame_start) <= int(curr_json.split("_")[-2]) <= int(frame_end):
@@ -108,9 +152,9 @@ for line_video_list in lines_video_list:  # for each video
         # FOR EACH FRAME, DO SOMETHING
         lol = get_body_points(action_frames, focus_2ppl=ppl_focus)
         print "lol length: ", len(lol)
-        #lol = centering(lol)
-        #features.append("")
+        lol = centering(lol)
+        lol = normalize(lol)
+        for lnl in lol:
+            plot(lnl)
+        # features.append("")
         labels.append(video_name[0])
-
-
-
