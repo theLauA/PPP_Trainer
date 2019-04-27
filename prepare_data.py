@@ -52,7 +52,7 @@ def plots(keypoints_lists):
                         [-keypoints_lists[i][k*3+1],-keypoints_lists[i][l*3+1]])
         ax.set_yticks(range(-200,60,40))
     plt.show()
-def get_body_point(body_points_arrays, num):
+def get_specific_point(body_points_arrays, num):
     return body_points_arrays[num * 3], body_points_arrays[num * 3 + 1]
 
 
@@ -196,8 +196,10 @@ for line_video_list in lines_video_list:  # for each video
         old_lol = np.array(lol)
         lol = normalize(lol)
         
+        points = []
         for idx,lnl in enumerate(lol):
             #plots( [lnl,old_lol[idx]] )
-            points = normalize_range(lnl)
-            
+            points.append(normalize_range(lnl))
+        points = np.array(points)
+        print(points.shape)
         labels.append(video_name[0])
