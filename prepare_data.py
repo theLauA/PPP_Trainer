@@ -4,6 +4,9 @@ import math
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+import skimage as sk
+from skimage import transform
+import random
 
 def plot(keypoints):
     keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
@@ -153,7 +156,27 @@ def normalize_range(keypoints):
     mins = np.min(keypoints_ls,axis=0,keepdims=True)
     return (keypoints_ls - mins)/(maxs-mins)
 
+def plot_jittered(keypoints,probability):
+    keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
+                       [1, 2], [1, 5], [1, 8],
+                       [2, 3], [3, 4],
+                       [5, 6], [6, 7],
+                       [8, 9], [8, 12],
+                       [9, 10], [10, 11], [11, 22], [11, 24], [22, 23],
+                       [12, 13], [13, 14], [14, 19], [14, 21], [19, 20]]
+    keypoints_pairs = np.array(keypoints_pairs)
 
+    plt.figure(figsize=(3, 8))
+    plt.yticks([-200, -180, -160, -140, -120, -100, -80, -60, -40, -20, 0, 20, 40])
+    for pair in keypoints_pairs:
+        k, l = pair
+        #print(k,l,keypoints[k],keypoints[l])
+        if (probability[k]> 0 and probability[l] > 0):
+            #print(k, l, keypoints_ls_normalize[k, :2], keypoints_ls_normalize[l, :2])
+            plt.plot([keypoints[k, 0], keypoints[l, 0]],
+                     [keypoints[k, 1], keypoints[l, 1]])
+
+    plt.show()
 ########################Main Code Begin##############################################################
 data_path = './data/'
 
@@ -212,6 +235,13 @@ for line_video_list in lines_video_list:  # for each video
         features = np.zeros(K*n_feature_keypoint)
         for w in range(0,N,step):
             current_window = points[w:w+window,:,:]
+            
+            #random_degree = random.uniform(-25, 25)
+            #jittered = sk.transform.rotate(np.array(current_window[0,:,:2]), random_degree)
+        
+            #print(jittered)
+            #plot_jittered(jittered,current_window[0,:,1])
+
             n,nx,ny = current_window.shape
             if n < 10:
                 break
