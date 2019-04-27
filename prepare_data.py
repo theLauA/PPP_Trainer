@@ -33,11 +33,11 @@ def plot(keypoints):
     plt.show()
 
 
-def get_body_point(body_points_arrays, num):
+def get_specific_point(body_points_arrays, num):
     return body_points_arrays[num * 3], body_points_arrays[num * 3 + 1]
 
 
-def write_body_point(body_points_arrays, num, point_x, point_y):
+def write_specific_point(body_points_arrays, num, point_x, point_y):
     body_points_arrays[int(num) * 3] = point_x
     body_points_arrays[int(num) * 3 + 1] = point_y
     return body_points_arrays
@@ -54,6 +54,16 @@ def distance(center_x, center_y, touch_x, touch_y):
     return ((center_x - touch_x) ** 2 + (center_y - touch_y) ** 2) ** 0.5
 
 
+def body_points_avg_x (body_points):
+    count = 1
+    total = 0
+    for i in range(0, 25):
+        if body_points[i * 3] !=0:
+            total+=body_points[i * 3]
+            count +=1
+    return total/count
+
+
 def get_body_points(filenames, focus_2ppl="none"):
     body_points_all_frame = []
     for filename in filenames:
@@ -61,9 +71,11 @@ def get_body_points(filenames, focus_2ppl="none"):
         if focus_2ppl == "none":  # in case of 1ppl
             body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
         else:  # in case of 2ppl
+            if data['people'][1]["pose_keypoints_2d"] == [0]*75:
+                body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
+                continue
             left_ppl, right_ppl = None, None
-            if data['people'][0]["pose_keypoints_2d"][0] > data['people'][1]["pose_keypoints_2d"][
-                0]:  # compare nose's x values to see which is left
+            if body_points_avg_x(data['people'][0]["pose_keypoints_2d"]) > body_points_avg_x(data['people'][1]["pose_keypoints_2d"]):  # compare nose's x values to see which is left
                 left_ppl = data['people'][1]["pose_keypoints_2d"]
                 right_ppl = data['people'][0]["pose_keypoints_2d"]
             else:
@@ -88,8 +100,8 @@ def normalize(body_points_arrays):
     ideal_neck_length = 50.0
     longest_neck = -1
     for body_points_array in body_points_arrays:  # find the longest neck among all frames
-        nose_x, nose_y = get_body_point(body_points_array,0)
-        neck_x, neck_y = get_body_point(body_points_array,1)
+        nose_x, nose_y = get_specific_point(body_points_array, 0)
+        neck_x, neck_y = get_specific_point(body_points_array, 1)
         neck_length = distance(nose_x,nose_y, neck_x, neck_y)
         if neck_length > longest_neck:
             longest_neck = neck_length
@@ -98,14 +110,14 @@ def normalize(body_points_arrays):
     normalized = []
     for body_points_array in body_points_arrays: # normalize each body points array
         temp_array = copy.deepcopy(body_points_array)
-        nose_x, nose_y = get_body_point(body_points_array, 0)
+        nose_x, nose_y = get_specific_point(body_points_array, 0)
         for i in range(0, 25):
-            point_x, point_y = get_body_point(body_points_array, i)
+            point_x, point_y = get_specific_point(body_points_array, i)
             angle_with_neck = angle(nose_x, nose_y, point_x, point_y)
             distance_with_neck = distance(nose_x, nose_y, point_x, point_y)
             x = nose_x + distance_with_neck / ratio_to_divide * math.cos(angle_with_neck)
             y = nose_y + distance_with_neck / ratio_to_divide * math.sin(angle_with_neck)
-            temp_array = write_body_point(temp_array, i, x, y)
+            temp_array = write_specific_point(temp_array, i, x, y)
         normalized.append(temp_array)
     return normalized
 
@@ -154,7 +166,8 @@ for line_video_list in lines_video_list:  # for each video
         print "lol length: ", len(lol)
         lol = centering(lol)
         lol = normalize(lol)
-        for lnl in lol:
-            plot(lnl)
+        if video_name == "101-1":
+            for lnl in lol:
+                plot(lnl)
         # features.append("")
         labels.append(video_name[0])
