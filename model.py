@@ -11,10 +11,14 @@ from sklearn.metrics import accuracy_score
 
 np.random.seed(seed=42)
 
-prepare_data("./data/")
-data = genfromtxt('features.csv', delimiter=',')
+#prepare_data("./data/")
+#data = genfromtxt('features.csv', delimiter=',')
+data = genfromtxt('features_subject.csv', delimiter=',')
+X, y, S = data[:, :-2], data[:, -2], data[:,-1]
+X[np.isnan(X)] = 0
+X[np.where(X==float("Inf"))] = 0
+print(X.shape,y.shape,S.shape)
 
-X, y = data[:, 0:data.shape[1] - 1], data[:, -1]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
 
 

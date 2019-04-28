@@ -194,7 +194,7 @@ def prepare_data(data_path):
 
     features = []
     labels = []
-
+    videos = []
     for line_video_list in lines_video_list:  # for each video
         # basic info
         video_name = line_video_list.rstrip('\n').split(",")[0]
@@ -241,7 +241,7 @@ def prepare_data(data_path):
 
             window = 20
             step = 5
-            n_feature_keypoint = 8
+            n_feature_keypoint = 13
 
             for w in range(0, N, step):
                 current_window = points[w:w + window, :, :] # [0:20,25,3]
@@ -269,9 +269,12 @@ def prepare_data(data_path):
 
                 features.append(current_features)
                 labels.append(int(video_name[0]))
-
+                videos.append(int(video_name[0:3]))
     features = np.array(features)
     labels = np.array(labels)
-    print(features[0])
-    print(features.shape, labels.shape)
-    np.savetxt("features.csv", np.append(features, labels[:, np.newaxis], axis=1), delimiter=",")
+    videos = np.array(videos)
+    print(features.shape, labels.shape, videos.shape)
+    np.savetxt("features_subject.csv", np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
+
+if __name__ == "__main__":
+    prepare_data('./data/')
