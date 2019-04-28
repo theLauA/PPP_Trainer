@@ -18,34 +18,45 @@ X, y, S = data[:, :-2], data[:, -2], data[:,-1]
 X[np.isnan(X)] = 0
 X[np.where(X==float("Inf"))] = 0
 print(X.shape,y.shape,S.shape)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
-
+print(np.unique(S))
 
 
-#random-forest
-clf = RandomForestClassifier(n_estimators=100, max_depth=3, random_state=0)
-clf = clf.fit(X_train, y_train)
-y_pred=clf.predict(X_test)
+for forehand in [1,3,4,5]:
+    for backhand in [101,102,103,104,105]:
+        for smash in [201,202,203,204]:
+            print(forehand,backhand,smash)
+            S_mask = np.logical_or(np.logical_or((S==forehand),(S==backhand)),(S==smash))
 
-"""
-#decision-tree
-clf = tree.DecisionTreeClassifier()
-clf = clf.fit(X_train, y_train)
-y_pred=clf.predict(X_test)
+            X_train, X_test, y_train, y_test = X[~S_mask], X[S_mask],y[~S_mask], y[S_mask]
 
-#logistic regression
-clf = LogisticRegression(random_state=0, solver='lbfgs',multi_class='multinomial')
-clf=clf.fit(X_train, y_train)
-y_pred=clf.predict(X_test)
-
-#SVC
-clf= SVC(gamma='scale')
-clf=clf.fit(X_train, y_train)
-y_pred=clf.predict(X_test)
-"""
+            print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+            #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
 
 
-target_names = ['class 0', 'class 1', 'class 2']
-print(classification_report(y_test, y_pred, target_names=target_names))
-print accuracy_score(y_test, y_pred)
+
+            #random-forest
+            clf = RandomForestClassifier(n_estimators=100, max_depth=3, random_state=0)
+            clf = clf.fit(X_train, y_train)
+            y_pred=clf.predict(X_test)
+
+            """
+            #decision-tree
+            clf = tree.DecisionTreeClassifier()
+            clf = clf.fit(X_train, y_train)
+            y_pred=clf.predict(X_test)
+
+            #logistic regression
+            clf = LogisticRegression(random_state=0, solver='lbfgs',multi_class='multinomial')
+            clf=clf.fit(X_train, y_train)
+            y_pred=clf.predict(X_test)
+
+            #SVC
+            clf= SVC(gamma='scale')
+            clf=clf.fit(X_train, y_train)
+            y_pred=clf.predict(X_test)
+            """
+
+
+            target_names = ['class 0', 'class 1', 'class 2']
+            print(classification_report(y_test, y_pred, target_names=target_names))
+            print accuracy_score(y_test, y_pred)
