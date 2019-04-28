@@ -9,7 +9,7 @@ def _extract_features_(points):
     result = np.append(result,_mins_(points))
     result = np.append(result,_maxs_(points))
     result = np.append(result,_median_(points))
-    result = np.append(result,_regress_(points))
+    #result = np.append(result,_regress_(points))
 
     
     return result
