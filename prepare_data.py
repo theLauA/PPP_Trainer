@@ -93,21 +93,24 @@ def get_body_points(filenames, focus_2ppl="none"):
     body_points_all_frame = []
     for filename in filenames:
         data = json.load(open(filename, "r"))  # read json files
-        if focus_2ppl == "none":  # in case of 1ppl
-            body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
-        else:  # in case of 2ppl
-            if data['people'][1]["pose_keypoints_2d"] == [0] * 75:
+        if(len(data["people"]) == 0):
+            pass
+        else:
+            if focus_2ppl == "none":  # in case of 1ppl
                 body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
-                continue
-            left_ppl, right_ppl = None, None
-            if body_points_avg_x(data['people'][0]["pose_keypoints_2d"]) > body_points_avg_x(
-                    data['people'][1]["pose_keypoints_2d"]):  # compare nose's x values to see which is left
-                left_ppl = data['people'][1]["pose_keypoints_2d"]
-                right_ppl = data['people'][0]["pose_keypoints_2d"]
-            else:
-                left_ppl = data['people'][0]["pose_keypoints_2d"]
-                right_ppl = data['people'][1]["pose_keypoints_2d"]
-            body_points_all_frame.append(left_ppl) if focus_2ppl == "left" else body_points_all_frame.append(right_ppl)
+            else:  # in case of 2ppl
+                if data['people'][1]["pose_keypoints_2d"] == [0] * 75:
+                    body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
+                    continue
+                left_ppl, right_ppl = None, None
+                if body_points_avg_x(data['people'][0]["pose_keypoints_2d"]) > body_points_avg_x(
+                        data['people'][1]["pose_keypoints_2d"]):  # compare nose's x values to see which is left
+                    left_ppl = data['people'][1]["pose_keypoints_2d"]
+                    right_ppl = data['people'][0]["pose_keypoints_2d"]
+                else:
+                    left_ppl = data['people'][0]["pose_keypoints_2d"]
+                    right_ppl = data['people'][1]["pose_keypoints_2d"]
+                body_points_all_frame.append(left_ppl) if focus_2ppl == "left" else body_points_all_frame.append(right_ppl)
     return body_points_all_frame
 
 
@@ -301,68 +304,62 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
         print("Current Video: ", video_name)
         lines_frame_range = open(path_frame_range, "r").readlines()
 
-        for line_frame_range in lines_frame_range:  # for each action (frame range)
+        ranges_to_label = np.ones(len(all_json_files))
+        ranges_to_label *= 3
+        for line_frame_range in lines_frame_range:
+            #Find label for Each Frame
+            frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+            frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+            ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
 
-            frame_start = line_frame_range.rstrip('\n').split(",")[0]
-            frame_end = line_frame_range.rstrip('\n').split(",")[1]
-            print("frame start: ", frame_start, " - frame_end: ", frame_end)
+        window_size = 20
+        window_step = 5
+        n_feature_keypoint = 13
+        for window_start_idx in range(0,len(all_json_files)-window_size,window_step):
             action_frames = []
             for curr_json in all_json_files:
-                if int(frame_start) <= int(curr_json.split("_")[-2]) <= int(frame_end):
+                curr_json_idx = int(curr_json.split("_")[-2])
+                if curr_json_idx >= (window_size + window_start_idx):
+                    break
+                if curr_json_idx >= window_start_idx:
                     action_frames.append(curr_json)
-            # FOR EACH FRAME, DO SOMETHING
-            lol = get_body_points(action_frames, focus_2ppl=ppl_focus)
-            print("lol length: ", len(lol))
+
+            lol = get_body_points(action_frames,focus_2ppl=ppl_focus)
             lol = centering(lol)
-            old_lol = np.array(lol)
             lol = normalize(lol)
 
             points = []
-            for idx, lnl in enumerate(lol):
-                # plots( [lnl,old_lol[idx]] )
+            for lnl in lol:
                 points.append(normalize_range(lnl))
-            points = np.array(points)
-
-            N, K, dim = points.shape
-            # N = number of frames, K = num_body_points, dim = 3 points
-
-            window = 20
-            step = 5
-            n_feature_keypoint = 13
-
-            for w in range(0, N, step):
-                current_window = points[w:w + window, :, :] # [0:20,25,3]
-                current_features = np.zeros(K * n_feature_keypoint)
-
-                n, nx, ny = current_window.shape # [0:20,25,3]
-                if n < 10:  # less than 10 frames in the window
+            curr_window_points = np.array(points)
+            N, K, dim = curr_window_points.shape
+            current_features = np.zeros(K * n_feature_keypoint)
+            for i in range(K):
+                # Get Specific points over the Window
+                n, nx, ny = curr_window_points.shape
+                point_time_series = curr_window_points[:, i, :].reshape(n, ny)
+                # Remove Invalid points and Drop Probability
+                point_time_series = point_time_series[point_time_series[:, 2] > 0]
+                point_time_series = point_time_series[:, 0:2]
+                if point_time_series.shape[0] < 10:
                     break
-
-                for i in range(K):
-                    # Get Specific points over the Window
-                    point_time_series = current_window[:, i, :].reshape(n, ny)
-                    # Remove Invalid points and Drop Probability
-                    point_time_series = point_time_series[point_time_series[:, 2] > 0]
-                    point_time_series = point_time_series[:, 0:2]
-
-                    if point_time_series.shape[0] < 10:
-                        # Just Leave features as Zeros for such keypoint
-                        break
-
-                    # print(point_time_series.shape)
-                    current_features[
-                    i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
-                        point_time_series)
-
-                features.append(current_features)
-                labels.append(int(video_name[0]))
-                videos.append(int(video_name[0:3]))
+                current_features[
+                i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
+                    point_time_series)
+            features.append(current_features)
+            window_start_label = ranges_to_label[window_start_idx]
+            window_end_label = ranges_to_label[window_start_idx+window_size-1]
+            if window_start_label == window_end_label:
+                labels.append(window_start_idx)
+            else:
+                labels.append(3)
+            videos.append(int(video_name[0:3]))
     features = np.array(features)
     labels = np.array(labels)
     videos = np.array(videos)
     print(features.shape, labels.shape, videos.shape)
-    np.savetxt("features_subject.csv", np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
+    np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
 
 
 if __name__ == "__main__":
-    prepare_data('./data/')
+    prepare_data_4_classes()
