@@ -20,7 +20,10 @@ X[np.isinf(X)] = 0
 print(X.shape,y.shape,S.shape)
 print(np.unique(S))
 
-avgs = []
+avgs_precision = []
+avgs_recall = []
+avgs_f1 = []
+
 for forehand in [1,3,4,5]:
     for backhand in [101,102,103,104,105]:
         for smash in [201,202,203,204]:
@@ -61,9 +64,15 @@ for forehand in [1,3,4,5]:
             y_pred = np.argmax(y_pred,axis=1)
             y_pred[y_pred_mask] = 3
             #print(np.sum(y_pred_mask))
-            #target_names = ['class 0', 'class 1', 'class 2','class 3']
-            #print(classification_report(y_test, y_pred, target_names=target_names))
-            avgs.append(accuracy_score(y_test, y_pred))
+            target_names = ['class 0', 'class 1', 'class 2','class 3']
+            scores = classification_report(y_test, y_pred, labels=[0,1,2,3], target_names=target_names,output_dict=True)
+            avgs_precision.append(scores["weighted avg"]["precision"])
+            avgs_recall.append(scores["weighted avg"]["recall"])
+            avgs_f1.append(scores["weighted avg"]["f1-score"])
+            #avgs.append(accuracy_score(y_test, y_pred))
             #print(accuracy_score(y_test, y_pred))
-avgs = np.array(avgs)
-print(np.mean(avgs))
+avgs_precision = np.array(avgs_precision)
+avgs_recall = np.array(avgs_recall)
+avgs_f1 = np.array(avgs_f1)
+
+print(np.mean(avgs_precision),np.mean(avgs_recall),np.mean(avgs_f1))
