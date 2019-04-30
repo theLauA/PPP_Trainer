@@ -8,6 +8,8 @@ import random
 from features import _extract_features_
 
 n_feature_keypoint = 23
+
+
 def plot(keypoints):
     keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
                        [1, 2], [1, 5], [1, 8],
@@ -36,7 +38,7 @@ def plot(keypoints):
     plt.show()
 
 
-def plots(keypoints_lists,filename=None):
+def plots(keypoints_lists, filename=None):
     keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
                        [1, 2], [1, 5], [1, 8],
                        [2, 3], [3, 4],
@@ -46,7 +48,7 @@ def plots(keypoints_lists,filename=None):
                        [12, 13], [13, 14], [14, 19], [14, 21], [19, 20]]
     keypoints_pairs = np.array(keypoints_pairs)
     N = len(keypoints_lists)
-    
+
     plt.figure(figsize=(3, 8))
     for i in range(N):
         ax = plt.subplot(1, N, i + 1)
@@ -62,118 +64,6 @@ def plots(keypoints_lists,filename=None):
     else:
         plt.savefig(filename)
         plt.clf()
-
-
-def get_specific_point(body_points_arrays, num):
-    return body_points_arrays[num * 3], body_points_arrays[num * 3 + 1]
-
-
-def write_specific_point(body_points_arrays, num, point_x, point_y):
-    body_points_arrays[int(num) * 3] = point_x
-    body_points_arrays[int(num) * 3 + 1] = point_y
-    return body_points_arrays
-
-
-def angle(center_x, center_y, touch_x, touch_y):
-    delta_x = touch_x - center_x
-    delta_y = touch_y - center_y
-    theta_radians = math.atan2(delta_y, delta_x)
-    return theta_radians
-
-
-def distance(center_x, center_y, touch_x, touch_y):
-    return ((center_x - touch_x) ** 2 + (center_y - touch_y) ** 2) ** 0.5
-
-
-def body_points_avg_x(body_points):
-    count = 1
-    total = 0
-    for i in range(0, 25):
-        if body_points[i * 3] != 0:
-            total += body_points[i * 3]
-            count += 1
-    return total / count
-
-
-def get_body_points(filenames, focus_2ppl="none"):
-    body_points_all_frame = []
-    for filename in filenames:
-        data = json.load(open(filename, "r"))  # read json files
-        if(len(data["people"]) == 0):
-            pass
-        else:
-            if focus_2ppl == "none":  # in case of 1ppl
-                body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
-            else:  # in case of 2ppl
-                if data['people'][1]["pose_keypoints_2d"] == [0] * 75:
-                    body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
-                    continue
-                left_ppl, right_ppl = None, None
-                if body_points_avg_x(data['people'][0]["pose_keypoints_2d"]) > body_points_avg_x(
-                        data['people'][1]["pose_keypoints_2d"]):  # compare nose's x values to see which is left
-                    left_ppl = data['people'][1]["pose_keypoints_2d"]
-                    right_ppl = data['people'][0]["pose_keypoints_2d"]
-                else:
-                    left_ppl = data['people'][0]["pose_keypoints_2d"]
-                    right_ppl = data['people'][1]["pose_keypoints_2d"]
-                body_points_all_frame.append(left_ppl) if focus_2ppl == "left" else body_points_all_frame.append(right_ppl)
-    return body_points_all_frame
-
-
-# centering with respect nose
-def centering(body_points_arrays):
-    for body_points_array in body_points_arrays:  # for each body points array
-        nose_x = body_points_array[0]
-        nose_y = body_points_array[1]
-        for i in range(0, 25):
-            body_points_array[i * 3] -= nose_x
-            body_points_array[i * 3 + 1] -= nose_y
-    return body_points_arrays
-
-
-def normalize(body_points_arrays):
-    ideal_neck_length = 50.0
-    longest_neck = -1
-    for body_points_array in body_points_arrays:  # find the longest neck among all frames
-        nose_x, nose_y = get_specific_point(body_points_array, 0)
-        neck_x, neck_y = get_specific_point(body_points_array, 1)
-        neck_length = distance(nose_x, nose_y, neck_x, neck_y)
-        if neck_length > longest_neck:
-            longest_neck = neck_length
-    ratio_to_divide = longest_neck / ideal_neck_length
-
-    normalized = []
-    for body_points_array in body_points_arrays:  # normalize each body points array
-        temp_array = copy.deepcopy(body_points_array)
-        nose_x, nose_y = get_specific_point(body_points_array, 0)
-        for i in range(0, 25):
-            point_x, point_y = get_specific_point(body_points_array, i)
-            angle_with_neck = angle(nose_x, nose_y, point_x, point_y)
-            distance_with_neck = distance(nose_x, nose_y, point_x, point_y)
-            if ratio_to_divide * math.cos(angle_with_neck) != 0: 
-                x = nose_x + distance_with_neck / ratio_to_divide * math.cos(angle_with_neck)
-            else:
-                x = nose_x
-            if ratio_to_divide * math.sin(angle_with_neck) != 0:
-                y = nose_y + distance_with_neck / ratio_to_divide * math.sin(angle_with_neck)
-            else:
-                y = nose_y
-            temp_array = write_specific_point(temp_array, i, x, y)
-        normalized.append(temp_array)
-    return normalized
-
-
-# def normalize_body_size(body_points_arrays, ideal_neck_size=20):
-
-# Change flat keypoints shape
-def normalize_range(keypoints):
-    keypoints_ls = []
-    for idx in range(0, len(keypoints), 3):
-        keypoints_ls.append([-keypoints[idx], -keypoints[idx + 1], keypoints[idx + 2]])
-    keypoints_ls = np.array(keypoints_ls)
-    maxs = np.max(keypoints_ls, axis=0, keepdims=True)
-    mins = np.min(keypoints_ls, axis=0, keepdims=True)
-    return (keypoints_ls - mins) / (maxs - mins)
 
 
 def plot_jittered(keypoints, probability):
@@ -198,8 +88,122 @@ def plot_jittered(keypoints, probability):
 
     plt.show()
 
+
+def get_body25_specific(body25, num):
+    return body25[num * 3], body25[num * 3 + 1]
+
+
+def write_body25_specific(body25, num, point_x, point_y):
+    body25[int(num) * 3] = point_x
+    body25[int(num) * 3 + 1] = point_y
+    return body25
+
+
+def angle(center_x, center_y, point_x, point_y):
+    delta_x = point_x - center_x
+    delta_y = point_y - center_y
+    theta_radians = math.atan2(delta_y, delta_x)
+    return theta_radians
+
+
+def distance(center_x, center_y, point_x, point_y):
+    return ((center_x - point_x) ** 2 + (center_y - point_y) ** 2) ** 0.5
+
+
+def body25_avg_x(body25):
+    count = 1
+    total = 0
+    for i in range(0, 25):
+        if body25[i * 3] != 0:
+            total += body25[i * 3]
+            count += 1
+    return total / count
+
+
+def get_body25_all_frames(filenames, focus_2ppl="none"):
+    body_points_all_frame = []
+    for filename in filenames:
+        data = json.load(open(filename, "r"))  # read json files
+        if (len(data["people"]) == 0):
+            pass
+        else:
+            if focus_2ppl == "none":  # in case of 1ppl
+                body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
+            else:  # in case of 2ppl
+                if data['people'][1]["pose_keypoints_2d"] == [0] * 75:
+                    body_points_all_frame.append(data['people'][0]['pose_keypoints_2d'])
+                    continue
+                left_ppl, right_ppl = None, None
+                if body25_avg_x(data['people'][0]["pose_keypoints_2d"]) > body25_avg_x(
+                        data['people'][1]["pose_keypoints_2d"]):  # compare nose's x values to see which is left
+                    left_ppl = data['people'][1]["pose_keypoints_2d"]
+                    right_ppl = data['people'][0]["pose_keypoints_2d"]
+                else:
+                    left_ppl = data['people'][0]["pose_keypoints_2d"]
+                    right_ppl = data['people'][1]["pose_keypoints_2d"]
+                body_points_all_frame.append(left_ppl) if focus_2ppl == "left" else body_points_all_frame.append(
+                    right_ppl)
+    return body_points_all_frame
+
+
+# centering with respect nose
+def centering(body_points_arrays):
+    for body_points_array in body_points_arrays:  # for each body points array
+        nose_x = body_points_array[0]
+        nose_y = body_points_array[1]
+        for i in range(0, 25):
+            body_points_array[i * 3] -= nose_x
+            body_points_array[i * 3 + 1] -= nose_y
+    return body_points_arrays
+
+
+def normalize(body_points_arrays):
+    ideal_neck_length = 50.0
+    longest_neck = -1
+    for body_points_array in body_points_arrays:  # find the longest neck among all frames
+        nose_x, nose_y = get_body25_specific(body_points_array, 0)
+        neck_x, neck_y = get_body25_specific(body_points_array, 1)
+        neck_length = distance(nose_x, nose_y, neck_x, neck_y)
+        if neck_length > longest_neck:
+            longest_neck = neck_length
+    ratio_to_divide = longest_neck / ideal_neck_length
+
+    normalized = []
+    for body_points_array in body_points_arrays:  # normalize each body points array
+        temp_array = copy.deepcopy(body_points_array)
+        nose_x, nose_y = get_body25_specific(body_points_array, 0)
+        for i in range(0, 25):
+            point_x, point_y = get_body25_specific(body_points_array, i)
+            angle_with_neck = angle(nose_x, nose_y, point_x, point_y)
+            distance_with_neck = distance(nose_x, nose_y, point_x, point_y)
+            if ratio_to_divide * math.cos(angle_with_neck) != 0:
+                x = nose_x + distance_with_neck / ratio_to_divide * math.cos(angle_with_neck)
+            else:
+                x = nose_x
+            if ratio_to_divide * math.sin(angle_with_neck) != 0:
+                y = nose_y + distance_with_neck / ratio_to_divide * math.sin(angle_with_neck)
+            else:
+                y = nose_y
+            temp_array = write_body25_specific(temp_array, i, x, y)
+        normalized.append(temp_array)
+    return normalized
+
+
+# def normalize_body_size(body_points_arrays, ideal_neck_size=20):
+
+# Change flat keypoints shape
+def normalize_range(keypoints):
+    keypoints_ls = []
+    for idx in range(0, len(keypoints), 3):
+        keypoints_ls.append([-keypoints[idx], -keypoints[idx + 1], keypoints[idx + 2]])
+    keypoints_ls = np.array(keypoints_ls)
+    maxs = np.max(keypoints_ls, axis=0, keepdims=True)
+    mins = np.min(keypoints_ls, axis=0, keepdims=True)
+    return (keypoints_ls - mins) / (maxs - mins)
+
+
 def prepare_data(data_path):
-    #data_path = './data/'
+    # data_path = './data/'
 
     lines_video_list = open(data_path + "video_list.csv", "r").readlines()
     videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
@@ -214,7 +218,7 @@ def prepare_data(data_path):
 
         # paths
         path_frame_range = data_path + "frame_range/" + video_name + ".csv"
-        path_frame_jsons = data_path + "after_openpose/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+        path_frame_jsons = data_path + "body_25/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
 
         # all frame jsons
         all_json_files = []
@@ -236,7 +240,7 @@ def prepare_data(data_path):
                 if int(frame_start) <= int(curr_json.split("_")[-2]) <= int(frame_end):
                     action_frames.append(curr_json)
             # FOR EACH FRAME, DO SOMETHING
-            lol = get_body_points(action_frames, focus_2ppl=ppl_focus)
+            lol = get_body25_all_frames(action_frames, focus_2ppl=ppl_focus)
             print("lol length: ", len(lol))
             lol = centering(lol)
             old_lol = np.array(lol)
@@ -255,10 +259,10 @@ def prepare_data(data_path):
             step = 5
 
             for w in range(0, N, step):
-                current_window = points[w:w + window, :, :] # [0:20,25,3]
+                current_window = points[w:w + window, :, :]  # [0:20,25,3]
                 current_features = np.zeros(K * n_feature_keypoint)
 
-                n, nx, ny = current_window.shape # [0:20,25,3]
+                n, nx, ny = current_window.shape  # [0:20,25,3]
                 if n < 10:  # less than 10 frames in the window
                     break
 
@@ -285,10 +289,13 @@ def prepare_data(data_path):
     labels = np.array(labels)
     videos = np.array(videos)
     print(features.shape, labels.shape, videos.shape)
-    np.savetxt("features_subject.csv", np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
+    np.savetxt("features_subject.csv",
+               np.append(np.append(features, labels[:, np.newaxis], axis=1), videos[:, np.newaxis], axis=1),
+               delimiter=",")
 
-def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
-    #data_path = './data/'
+
+def prepare_data_4_classes(data_path="./data/", file_path="features_4.csv"):
+    # data_path = './data/'
 
     lines_video_list = open(data_path + "video_list.csv", "r").readlines()
     videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
@@ -318,31 +325,31 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
         ranges_to_label = np.ones(len(all_json_files))
         ranges_to_label *= 3
         for line_frame_range in lines_frame_range:
-            #Find label for Each Frame
+            # Find label for Each Frame
             frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
             frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
-            ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
-            print(frame_start,frame_end,int(video_name[0]))
-        
+            ranges_to_label[frame_start:frame_end + 1] = int(video_name[0])
+            print(frame_start, frame_end, int(video_name[0]))
+
         window_size = 20
         window_step = 5
-        
-        for window_start_idx in range(0,len(all_json_files)-window_size,window_step):
-            
+
+        for window_start_idx in range(0, len(all_json_files) - window_size, window_step):
+
             window_start_label = ranges_to_label[window_start_idx]
-            window_end_label = ranges_to_label[window_start_idx+window_size-1]
-            if np.all(ranges_to_label[window_start_idx:window_start_idx+window_size]==window_start_label):
-                #print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
+            window_end_label = ranges_to_label[window_start_idx + window_size - 1]
+            if np.all(ranges_to_label[window_start_idx:window_start_idx + window_size] == window_start_label):
+                # print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
                 labels.append(window_start_label)
             elif window_start_label == window_end_label:
                 continue
             else:
-                
+
                 labels.append(3)
 
-            action_frames = all_json_files[window_start_idx:window_start_idx+window_size]
+            action_frames = all_json_files[window_start_idx:window_start_idx + window_size]
 
-            lol = get_body_points(action_frames,focus_2ppl=ppl_focus)
+            lol = get_body25_all_frames(action_frames, focus_2ppl=ppl_focus)
             lol = centering(lol)
             lol = normalize(lol)
 
@@ -370,13 +377,15 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
     labels = np.array(labels)
     videos = np.array(videos)
     print(features.shape, labels.shape, videos.shape)
-    np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
+    np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1), videos[:, np.newaxis], axis=1),
+               delimiter=",")
 
-def prepare_data_as_figure(data_path = "./data/"):
-    #data_path = './data/'
+
+def prepare_data_as_figure(data_path="./data/"):
+    # data_path = './data/'
 
     lines_video_list = open(data_path + "video_list.csv", "r").readlines()
-    #videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
+    # videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
 
     for line_video_list in lines_video_list:  # for each video
         # basic info
@@ -400,24 +409,25 @@ def prepare_data_as_figure(data_path = "./data/"):
         ranges_to_label = np.ones(len(all_json_files))
         ranges_to_label *= 3
         for line_frame_range in lines_frame_range:
-            #Find label for Each Frame
+            # Find label for Each Frame
             frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
             frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
-            ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
-            print(frame_start,frame_end,int(video_name[0]))
-    
-            lol = get_body_points(all_json_files,focus_2ppl=ppl_focus)
+            ranges_to_label[frame_start:frame_end + 1] = int(video_name[0])
+            print(frame_start, frame_end, int(video_name[0]))
+
+            lol = get_body25_all_frames(all_json_files, focus_2ppl=ppl_focus)
             lol = centering(lol)
             lol = normalize(lol)
 
             points = []
-            for idx,lnl in enumerate(lol):
-                #pass
-                plots([lnl],'./figures/'+video_name+"_"+str(idx)+"_"+str(int(ranges_to_label[idx])))
+            for idx, lnl in enumerate(lol):
+                # pass
+                plots([lnl], './figures/' + video_name + "_" + str(idx) + "_" + str(int(ranges_to_label[idx])))
                 points.append(normalize_range(lnl))
 
-def prepare_data_4_classes_raw(data_path = "./data/",file_path = "features_4_raw.csv"):
-    #data_path = './data/'
+
+def prepare_data_4_classes_raw(data_path="./data/", file_path="features_4_raw.csv"):
+    # data_path = './data/'
 
     lines_video_list = open(data_path + "video_list.csv", "r").readlines()
     videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
@@ -432,7 +442,7 @@ def prepare_data_4_classes_raw(data_path = "./data/",file_path = "features_4_raw
 
         # paths
         path_frame_range = data_path + "frame_range/" + video_name + ".csv"
-        path_frame_jsons = data_path + "after_openpose/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+        path_frame_jsons = data_path + "body_25/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
 
         # all frame jsons
         all_json_files = []
@@ -447,29 +457,28 @@ def prepare_data_4_classes_raw(data_path = "./data/",file_path = "features_4_raw
         ranges_to_label = np.ones(len(all_json_files))
         ranges_to_label *= 3
         for line_frame_range in lines_frame_range:
-            #Find label for Each Frame
+            # Find label for Each Frame
             frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
             frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
-            ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
-            print(frame_start,frame_end,int(video_name[0]))
-        
+            ranges_to_label[frame_start:frame_end + 1] = int(video_name[0])
+            print(frame_start, frame_end, int(video_name[0]))
+
         window_size = 20
         window_step = 5
-        
-        for window_start_idx in range(0,len(all_json_files)-window_size,window_step):
+
+        for window_start_idx in range(0, len(all_json_files) - window_size, window_step):
             current_label = 3
             window_start_label = ranges_to_label[window_start_idx]
-            window_end_label = ranges_to_label[window_start_idx+window_size-1]
-            if np.all(ranges_to_label[window_start_idx:window_start_idx+window_size]==window_start_label):
-                #print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
+            window_end_label = ranges_to_label[window_start_idx + window_size - 1]
+            if np.all(ranges_to_label[window_start_idx:window_start_idx + window_size] == window_start_label):
+                # print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
                 current_label = window_start_label
             elif window_start_label == window_end_label:
                 continue
-            
-            
-            action_frames = all_json_files[window_start_idx:window_start_idx+window_size]
 
-            lol = get_body_points(action_frames,focus_2ppl=ppl_focus)
+            action_frames = all_json_files[window_start_idx:window_start_idx + window_size]
+
+            lol = get_body25_all_frames(action_frames, focus_2ppl=ppl_focus)
             lol = centering(lol)
             lol = normalize(lol)
 
@@ -477,19 +486,21 @@ def prepare_data_4_classes_raw(data_path = "./data/",file_path = "features_4_raw
             for lnl in lol:
                 points.append(normalize_range(lnl))
             curr_window_points = np.array(points)
-            if curr_window_points[:,:,0:2].flatten()[np.newaxis,:].shape[1] != 1000:
+            if curr_window_points[:, :, 0:2].flatten()[np.newaxis, :].shape[1] != 1000:
                 print(window_start_idx)
                 continue
-            features.append(curr_window_points[:,:,0:2].flatten())
+            features.append(curr_window_points[:, :, 0:2].flatten())
             videos.append(int(video_name[0:3]))
             labels.append(current_label)
     features = np.array(features)
     labels = np.array(labels)
     videos = np.array(videos)
     print(features.shape, labels.shape, videos.shape)
-    np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
+    np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1), videos[:, np.newaxis], axis=1),
+               delimiter=",")
+
 
 if __name__ == "__main__":
-    #prepare_data("./data/")
+    # prepare_data("./data/")
     prepare_data_4_classes()
-    #prepare_data_4_classes_raw()
+    # prepare_data_4_classes_raw()
