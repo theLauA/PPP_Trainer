@@ -55,7 +55,7 @@ for forehand in [1,3,4,5]:
 
 
             #random-forest
-            clf = RandomForestClassifier(n_estimators=100, max_depth=3, random_state=0)
+            clf = RandomForestClassifier(n_estimators=100, max_depth=9, random_state=0)
             clf = clf.fit(X_train, y_train)
             #y_pred=clf.predict(X_test)
 
@@ -77,7 +77,7 @@ for forehand in [1,3,4,5]:
             """
 
             y_pred = clf.predict_proba(X_test)
-            y_pred_mask = np.max(y_pred,axis=1) < 0.9
+            y_pred_mask = np.max(y_pred,axis=1) < 0.5
             y_pred = np.argmax(y_pred,axis=1)
             y_pred[y_pred_mask] = 3
             #print(np.sum(y_pred_mask))
@@ -94,4 +94,4 @@ avgs_recall = np.array(avgs_recall)
 avgs_f1 = np.array(avgs_f1)
 
 print(np.mean(avgs_precision),np.mean(avgs_recall),np.mean(avgs_f1))
-print(cm/np.sum(cm))
+print(cm)

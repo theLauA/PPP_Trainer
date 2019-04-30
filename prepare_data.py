@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import random
 from features import _extract_features_
 
-
+n_feature_keypoint = 23
 def plot(keypoints):
     keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
                        [1, 2], [1, 5], [1, 8],
@@ -253,7 +253,6 @@ def prepare_data(data_path):
 
             window = 20
             step = 5
-            n_feature_keypoint = 13
 
             for w in range(0, N, step):
                 current_window = points[w:w + window, :, :] # [0:20,25,3]
@@ -327,7 +326,6 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
         
         window_size = 20
         window_step = 5
-        n_feature_keypoint = 13
         
         for window_start_idx in range(0,len(all_json_files)-window_size,window_step):
             
@@ -342,13 +340,7 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
                 
                 labels.append(3)
 
-            action_frames = []
-            for curr_json in all_json_files:
-                curr_json_idx = int(curr_json.split("_")[-2])
-                if curr_json_idx >= (window_size + window_start_idx):
-                    break
-                if curr_json_idx >= window_start_idx:
-                    action_frames.append(curr_json)
+            action_frames = all_json_files[window_start_idx:window_start_idx+window_size]
 
             lol = get_body_points(action_frames,focus_2ppl=ppl_focus)
             lol = centering(lol)
@@ -420,8 +412,84 @@ def prepare_data_as_figure(data_path = "./data/"):
 
             points = []
             for idx,lnl in enumerate(lol):
+                #pass
                 plots([lnl],'./figures/'+video_name+"_"+str(idx)+"_"+str(int(ranges_to_label[idx])))
                 points.append(normalize_range(lnl))
 
+def prepare_data_4_classes_raw(data_path = "./data/",file_path = "features_4_raw.csv"):
+    #data_path = './data/'
+
+    lines_video_list = open(data_path + "video_list.csv", "r").readlines()
+    videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
+
+    features = []
+    labels = []
+    videos = []
+    for line_video_list in lines_video_list:  # for each video
+        # basic info
+        video_name = line_video_list.rstrip('\n').split(",")[0]
+        ppl_focus = line_video_list.rstrip('\n').split(",")[1]
+
+        # paths
+        path_frame_range = data_path + "frame_range/" + video_name + ".csv"
+        path_frame_jsons = data_path + "after_openpose/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+
+        # all frame jsons
+        all_json_files = []
+        for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+            for file in f:
+                if '.json' in file:
+                    all_json_files.append(os.path.join(r, file))
+        print("******")
+        print("Current Video: ", video_name)
+        lines_frame_range = open(path_frame_range, "r").readlines()
+
+        ranges_to_label = np.ones(len(all_json_files))
+        ranges_to_label *= 3
+        for line_frame_range in lines_frame_range:
+            #Find label for Each Frame
+            frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+            frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+            ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
+            print(frame_start,frame_end,int(video_name[0]))
+        
+        window_size = 20
+        window_step = 5
+        
+        for window_start_idx in range(0,len(all_json_files)-window_size,window_step):
+            current_label = 3
+            window_start_label = ranges_to_label[window_start_idx]
+            window_end_label = ranges_to_label[window_start_idx+window_size-1]
+            if np.all(ranges_to_label[window_start_idx:window_start_idx+window_size]==window_start_label):
+                #print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
+                current_label = window_start_label
+            elif window_start_label == window_end_label:
+                continue
+            
+            
+            action_frames = all_json_files[window_start_idx:window_start_idx+window_size]
+
+            lol = get_body_points(action_frames,focus_2ppl=ppl_focus)
+            lol = centering(lol)
+            lol = normalize(lol)
+
+            points = []
+            for lnl in lol:
+                points.append(normalize_range(lnl))
+            curr_window_points = np.array(points)
+            if curr_window_points[:,:,0:2].flatten()[np.newaxis,:].shape[1] != 1000:
+                print(window_start_idx)
+                continue
+            features.append(curr_window_points[:,:,0:2].flatten())
+            videos.append(int(video_name[0:3]))
+            labels.append(current_label)
+    features = np.array(features)
+    labels = np.array(labels)
+    videos = np.array(videos)
+    print(features.shape, labels.shape, videos.shape)
+    np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
+
 if __name__ == "__main__":
-    prepare_data_as_figure()
+    #prepare_data("./data/")
+    prepare_data_4_classes()
+    #prepare_data_4_classes_raw()
