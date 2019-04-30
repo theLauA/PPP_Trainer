@@ -36,7 +36,7 @@ def plot(keypoints):
     plt.show()
 
 
-def plots(keypoints_lists):
+def plots(keypoints_lists,filename=None):
     keypoints_pairs = [[0, 15], [0, 16], [15, 17], [16, 18], [0, 1],
                        [1, 2], [1, 5], [1, 8],
                        [2, 3], [3, 4],
@@ -46,6 +46,8 @@ def plots(keypoints_lists):
                        [12, 13], [13, 14], [14, 19], [14, 21], [19, 20]]
     keypoints_pairs = np.array(keypoints_pairs)
     N = len(keypoints_lists)
+    
+    plt.figure(figsize=(3, 8))
     for i in range(N):
         ax = plt.subplot(1, N, i + 1)
 
@@ -55,7 +57,11 @@ def plots(keypoints_lists):
                 ax.plot([-keypoints_lists[i][k * 3], -keypoints_lists[i][l * 3]],
                         [-keypoints_lists[i][k * 3 + 1], -keypoints_lists[i][l * 3 + 1]])
         ax.set_yticks(range(-200, 60, 40))
-    plt.show()
+    if filename == None:
+        plt.show()
+    else:
+        plt.savefig(filename)
+        plt.clf()
 
 
 def get_specific_point(body_points_arrays, num):
@@ -144,8 +150,14 @@ def normalize(body_points_arrays):
             point_x, point_y = get_specific_point(body_points_array, i)
             angle_with_neck = angle(nose_x, nose_y, point_x, point_y)
             distance_with_neck = distance(nose_x, nose_y, point_x, point_y)
-            x = nose_x + distance_with_neck / ratio_to_divide * math.cos(angle_with_neck)
-            y = nose_y + distance_with_neck / ratio_to_divide * math.sin(angle_with_neck)
+            if ratio_to_divide * math.cos(angle_with_neck) != 0: 
+                x = nose_x + distance_with_neck / ratio_to_divide * math.cos(angle_with_neck)
+            else:
+                x = nose_x
+            if ratio_to_divide * math.sin(angle_with_neck) != 0:
+                y = nose_y + distance_with_neck / ratio_to_divide * math.sin(angle_with_neck)
+            else:
+                y = nose_y
             temp_array = write_specific_point(temp_array, i, x, y)
         normalized.append(temp_array)
     return normalized
@@ -311,11 +323,25 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
             frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
             frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
             ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
-
+            print(frame_start,frame_end,int(video_name[0]))
+        
         window_size = 20
         window_step = 5
         n_feature_keypoint = 13
+        
         for window_start_idx in range(0,len(all_json_files)-window_size,window_step):
+            
+            window_start_label = ranges_to_label[window_start_idx]
+            window_end_label = ranges_to_label[window_start_idx+window_size-1]
+            if np.all(ranges_to_label[window_start_idx:window_start_idx+window_size]==window_start_label):
+                #print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
+                labels.append(window_start_label)
+            elif window_start_label == window_end_label:
+                continue
+            else:
+                
+                labels.append(3)
+
             action_frames = []
             for curr_json in all_json_files:
                 curr_json_idx = int(curr_json.split("_")[-2])
@@ -347,12 +373,6 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
                 i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
                     point_time_series)
             features.append(current_features)
-            window_start_label = ranges_to_label[window_start_idx]
-            window_end_label = ranges_to_label[window_start_idx+window_size-1]
-            if window_start_label == window_end_label:
-                labels.append(window_start_idx)
-            else:
-                labels.append(3)
             videos.append(int(video_name[0:3]))
     features = np.array(features)
     labels = np.array(labels)
@@ -360,6 +380,48 @@ def prepare_data_4_classes(data_path = "./data/",file_path = "features_4.csv"):
     print(features.shape, labels.shape, videos.shape)
     np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
 
+def prepare_data_as_figure(data_path = "./data/"):
+    #data_path = './data/'
+
+    lines_video_list = open(data_path + "video_list.csv", "r").readlines()
+    #videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
+
+    for line_video_list in lines_video_list:  # for each video
+        # basic info
+        video_name = line_video_list.rstrip('\n').split(",")[0]
+        ppl_focus = line_video_list.rstrip('\n').split(",")[1]
+
+        # paths
+        path_frame_range = data_path + "frame_range/" + video_name + ".csv"
+        path_frame_jsons = data_path + "after_openpose/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+
+        # all frame jsons
+        all_json_files = []
+        for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+            for file in f:
+                if '.json' in file:
+                    all_json_files.append(os.path.join(r, file))
+        print("******")
+        print("Current Video: ", video_name)
+        lines_frame_range = open(path_frame_range, "r").readlines()
+
+        ranges_to_label = np.ones(len(all_json_files))
+        ranges_to_label *= 3
+        for line_frame_range in lines_frame_range:
+            #Find label for Each Frame
+            frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+            frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+            ranges_to_label[frame_start:frame_end+1] = int(video_name[0])
+            print(frame_start,frame_end,int(video_name[0]))
+    
+            lol = get_body_points(all_json_files,focus_2ppl=ppl_focus)
+            lol = centering(lol)
+            lol = normalize(lol)
+
+            points = []
+            for idx,lnl in enumerate(lol):
+                plots([lnl],'./figures/'+video_name+"_"+str(idx)+"_"+str(int(ranges_to_label[idx])))
+                points.append(normalize_range(lnl))
 
 if __name__ == "__main__":
-    prepare_data_4_classes()
+    prepare_data_as_figure()
