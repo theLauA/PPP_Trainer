@@ -135,6 +135,7 @@ def diff_in_frame(body25_1, body25_2):
     return total/ total_part
 
 
+# get body25s of frame(s)
 def get_body25s(filenames, focus_2ppl="none"):
     body_points_all_frame = []
     for frame_json in filenames:
@@ -151,52 +152,28 @@ def get_body25s(filenames, focus_2ppl="none"):
     return body_points_all_frame
 
 
-def get_body25s_spine_track(all_jsons, spine_frame_number, focus_2ppl="none"):
-    goal_spine_length = -1
-    # traverse all json file til reach the frame_spine frame, and get spine length
-    for curr_json in all_jsons:
-        if int(curr_json.split("_")[-2]) == spine_frame_number:
-            frame_spine = json.load(open(curr_json, "r"))
-            ppl = get_ppl(frame_spine)
-            if focus_2ppl == "left" or focus_2ppl == "none":
-                ppl_to_track = ppl[0]
-            else:
-                ppl_to_track = ppl[1]
-            goal_spine_length = get_spine_length(ppl_to_track)
-            break
+# spine tracking variation of get_body25s
+def get_body25s_spine_track(all_jsons, focus_2ppl="none"):
     # traverse all frames in the video
     body_25_all_frame = []
-    previous_two_ppl = []
     previous_chosen = [0] * 75
-    kage_bun_shin = []
     count = 0
     for curr_json in all_jsons:
-        print "count: ", count
-
+        #print ("curr_json: ", curr_json)
+        #print ("count: ", count)
         frame_data = json.load(open(curr_json, "r"))  # read json files
         ppl = get_ppl(frame_data)
-
-        temp_prev_ppl = copy.deepcopy(previous_two_ppl)
-        for person in previous_two_ppl:
+        # Remove none person object
+        temp_ppl = copy.deepcopy(ppl)
+        for person in ppl:
             if get_spine_length(person) < 10:
-                temp_prev_ppl.remove(person)
+                temp_ppl.remove(person)
                 break
-        previous_two_ppl = copy.deepcopy(ppl)
-        ppl = copy.deepcopy(temp_prev_ppl)
-        """
-        # remove kage bun shin(same)
-        temp_prev_ppl = copy.deepcopy(previous_two_ppl)
-        for person in previous_two_ppl:
-            if person in ppl or person in kage_bun_shin:
-                temp_prev_ppl.remove(person)
-                if get_spine_length(person) > 50:  # if a valid person
-                    kage_bun_shin.append(person)
-                break
-        previous_two_ppl = copy.deepcopy(ppl)
-        ppl = copy.deepcopy(temp_prev_ppl)
-        """
+        ppl = copy.deepcopy(temp_ppl)
+
+        # Selecting people
         if len(ppl) == 0:
-            continue
+            body_25_all_frame.append(body_25_all_frame[-1])
         elif len(ppl) == 1:
             body_25_all_frame.append(ppl[0])
         else:
@@ -220,14 +197,10 @@ def get_body25s_spine_track(all_jsons, spine_frame_number, focus_2ppl="none"):
                 body_25_all_frame.append(right_ppl)
 
         previous_chosen = copy.deepcopy(body_25_all_frame[-1])
-        """
-        if count == 17279: # 12004 12202 14015 17275 17277
-            print len(ppl)
-            print previous_chosen
-            plot(previous_chosen)
-        """
-
         count += 1
+        # if count == 377:
+        #    plot(previous_chosen)
+
     return body_25_all_frame
 
 
@@ -270,6 +243,22 @@ def get_spine_length(body25):
     spine_length = distance(neck_x, neck_y, hip_x, hip_y)
     return spine_length
 
+# no use for now
+def get_ideal_spine_length(all_jsons, spine_frame_number, focus_2ppl):
+    goal_spine_length = -1
+
+    # traverse all json file til reach the frame_spine frame, and get spine length
+    for curr_json in all_jsons:
+        if int(curr_json.split("_")[-2]) == spine_frame_number:
+            frame_spine = json.load(open(curr_json, "r"))
+            ppl = get_ppl(frame_spine)
+            if focus_2ppl == "left" or focus_2ppl == "none":
+                ppl_to_track = ppl[0]
+            else:
+                ppl_to_track = ppl[1]
+            goal_spine_length = get_spine_length(ppl_to_track)
+            break
+    return goal_spine_length
 
 # centering with respect nose
 def centering(body_points_arrays):
@@ -417,150 +406,81 @@ def prepare_data(data_path):
                delimiter=",")
 
 
-def prepare_test_data(data_path, test_video_name, focus_2ppl):
+def prepare_test_data(data_path, test_video_name, side , file_path="test_features_4.csv"):
     features = []
     labels = []
 
     # path to get frame in jsons
     path_frame_jsons = data_path + 'body_25/test/' + test_video_name + '/'
     # path to get frame range labels
-    path_frames_labels = data_path + 'frame_range/' + test_video_name + '.csv'
-    # all frame jsons
+    path_frame_range = data_path + 'frame_range/' + test_video_name + '.csv'
+    # get all frames' body 25
     path_all_frame_jsons = []
     for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
         for file in f:
             if '.json' in file:
                 path_all_frame_jsons.append(os.path.join(r, file))
-    # could swap
-    all_frame_jsons = get_body25s_spine_track(path_all_frame_jsons, 143, focus_2ppl=focus_2ppl)
-    print ("Num of frames: ", len(all_frame_jsons))
+    all_frame_jsons = get_body25s_spine_track(path_all_frame_jsons,focus_2ppl=side)
     all_frame_jsons = centering(all_frame_jsons)
     all_frame_jsons = np.array(all_frame_jsons)
     all_frame_jsons = normalize(all_frame_jsons)
 
-    plot(all_frame_jsons[475])
-    """
     points = []
     for idx, lnl in enumerate(all_frame_jsons):
         # plots( [lnl,all_frame_jsons[idx]] )
         points.append(normalize_range(lnl))
     points = np.array(points)
 
+    videos = []
+    # pre label
+    lines_frame_range = open(path_frame_range, "r").readlines()
+    ranges_to_label = np.ones(len(all_frame_jsons))
+    ranges_to_label *= 3
+    for line_frame_range in lines_frame_range:
+        # Find label for Each Frame
+        frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+        frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+        action_label = int(line_frame_range.rstrip('\n').split(",")[2])
+        ranges_to_label[frame_start:frame_end + 1] = action_label
+        print(frame_start, frame_end, action_label)
     # *********************************
-    print (points.shape)
-    N, K, dim = points.shape
+    window_size = 20
+    window_step = 5
 
-    # N = number of frames, K = num_body_points, dim = 3 points
+    for window_start_idx in range(0, len(all_frame_jsons) - window_size, window_step):
 
-    window = 20
-    step = 5
-    n_feature_keypoint = 25
+        window_start_label = ranges_to_label[window_start_idx]
+        window_end_label = ranges_to_label[window_start_idx + window_size - 1]
 
-    for w in range(0, N, step):
-        current_window = points[w:w + window, :, :]  # [0:20,25,3]
+        # if all label in the window equal to window start
+        if np.all(ranges_to_label[window_start_idx:window_start_idx + window_size] == window_start_label):
+            # print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
+            labels.append(window_start_label)
+        elif window_start_label == window_end_label:  # if window start label = window end label
+            continue
+        else:
+            labels.append(3)
+
+        curr_window_points = np.array(points[window_start_idx:window_start_idx + window_size, :, :])
+        N, K, dim = curr_window_points.shape
         current_features = np.zeros(K * n_feature_keypoint)
-
-        n, nx, ny = current_window.shape  # [0:20,25,3]
-        if n < 10:  # less than 10 frames in the window
-            break
-
-        # features
         for i in range(K):
             # Get Specific points over the Window
-            point_time_series = current_window[:, i, :].reshape(n, ny)
+            n, nx, ny = curr_window_points.shape
+            point_time_series = curr_window_points[:, i, :].reshape(n, ny)
             # Remove Invalid points and Drop Probability
             point_time_series = point_time_series[point_time_series[:, 2] > 0]
             point_time_series = point_time_series[:, 0:2]
-
             if point_time_series.shape[0] < 10:
-                # Just Leave features as Zeros for such keypoint
                 break
-
-            # print(point_time_series.shape)
             current_features[
             i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
                 point_time_series)
-
-            features.append(current_features)
-
-            # labels --NOT YET
-            
-            labels.append(int(video_name[0]))
-    np.savetxt("features_subject.csv",
-               np.append(features, labels[:, np.newaxis], axis=1),
-               delimiter=",")"""
-    print (len(features))
-    """
-    ppl_focus = line_video_list.rstrip('\n').split(",")[1]
-
-    # paths
-    path_frame_range = data_path + "frame_range/" + video_name + ".csv"
-    path_frame_jsons = data_path + "after_openpose/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
-
-    lines_frame_range = open(path_frame_range, "r").readlines()
-
-    for line_frame_range in lines_frame_range:  # for each action (frame range)
-
-        frame_start = line_frame_range.rstrip('\n').split(",")[0]
-        frame_end = line_frame_range.rstrip('\n').split(",")[1]
-        print "frame start: ", frame_start, " - frame_end: ", frame_end
-        action_frames = []
-        for curr_json in all_json_files:
-            if int(frame_start) <= int(curr_json.split("_")[-2]) <= int(frame_end):
-                action_frames.append(curr_json)
-        # FOR EACH FRAME, DO SOMETHING
-        lol = get_body_points(action_frames, focus_2ppl=ppl_focus)
-        print "lol length: ", len(lol)
-        lol = centering(lol)
-        old_lol = np.array(lol)
-        lol = normalize(lol)
-
-        points = []
-        for idx, lnl in enumerate(lol):
-            # plots( [lnl,old_lol[idx]] )
-            points.append(normalize_range(lnl))
-        points = np.array(points)
-
-        N, K, dim = points.shape
-        # N = number of frames, K = num_body_points, dim = 3 points
-
-        window = 20
-        step = 5
-        n_feature_keypoint = 13
-
-        for w in range(0, N, step):
-            current_window = points[w:w + window, :, :] # [0:20,25,3]
-            current_features = np.zeros(K * n_feature_keypoint)
-
-            n, nx, ny = current_window.shape # [0:20,25,3]
-            if n < 10:  # less than 10 frames in the window
-                break
-
-            for i in range(K):
-                # Get Specific points over the Window
-                point_time_series = current_window[:, i, :].reshape(n, ny)
-                # Remove Invalid points and Drop Probability
-                point_time_series = point_time_series[point_time_series[:, 2] > 0]
-                point_time_series = point_time_series[:, 0:2]
-
-                if point_time_series.shape[0] < 10:
-                    # Just Leave features as Zeros for such keypoint
-                    break
-
-                # print(point_time_series.shape)
-                current_features[
-                i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
-                    point_time_series)
-
-            features.append(current_features)
-            labels.append(int(video_name[0]))
-            videos.append(int(video_name[0:3]))
+        features.append(current_features)
     features = np.array(features)
     labels = np.array(labels)
-    videos = np.array(videos)
-    print(features.shape, labels.shape, videos.shape)
-    np.savetxt("features_subject.csv", np.append(np.append(features, labels[:, np.newaxis], axis=1),videos[:,np.newaxis],axis=1), delimiter=",")
-    """
+    print(features.shape, labels.shape)
+    np.savetxt(file_path, np.append(features, labels[:, np.newaxis], axis=1),delimiter=",")
 
 
 def prepare_data_4_classes(data_path="./data/", file_path="features_4.csv"):
@@ -579,7 +499,7 @@ def prepare_data_4_classes(data_path="./data/", file_path="features_4.csv"):
 
         # paths
         path_frame_range = data_path + "frame_range/" + video_name + ".csv"
-        path_frame_jsons = data_path + "after_openpose/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+        path_frame_jsons = data_path + "body_25/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
 
         # all frame jsons
         all_json_files = []
@@ -607,10 +527,11 @@ def prepare_data_4_classes(data_path="./data/", file_path="features_4.csv"):
 
             window_start_label = ranges_to_label[window_start_idx]
             window_end_label = ranges_to_label[window_start_idx + window_size - 1]
+            # if all label in the window equal to window start
             if np.all(ranges_to_label[window_start_idx:window_start_idx + window_size] == window_start_label):
                 # print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
                 labels.append(window_start_label)
-            elif window_start_label == window_end_label:
+            elif window_start_label == window_end_label: # if window start label = window end label
                 continue
             else:
 
@@ -774,3 +695,4 @@ if __name__ == "__main__":
     prepare_test_data("./data/", "TestVideo", "right")
     # prepare_data_4_classes()
     # prepare_data_4_classes_raw()
+    # prepare_data_as_figure("./data/")`
