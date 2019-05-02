@@ -98,6 +98,14 @@ def write_body25_specific(body25, num, point_x, point_y):
     body25[int(num) * 3 + 1] = point_y
     return body25
 
+def get_body25_exclude_confidence(body25):
+    body25_exclude_confidence = []
+    for i in range(0,25):
+        x, y = get_body25_specific(body25, i)
+        body25_exclude_confidence.append(x)
+        body25_exclude_confidence.append(y)
+    return body25_exclude_confidence
+
 
 def angle(center_x, center_y, point_x, point_y):
     delta_x = point_x - center_x
@@ -151,6 +159,22 @@ def get_body25s(filenames, focus_2ppl="none"):
                 right_ppl)
     return body_points_all_frame
 
+
+# get body25s of frame(s)
+def get_body25s(filenames, focus_2ppl="none"):
+    body_points_all_frame = []
+    for frame_json in filenames:
+        json_data = json.load(open(frame_json, "r"))  # read json files
+        ppl = get_ppl(json_data)
+        if len(ppl) == 0:
+            body_points_all_frame.append([0]*75)
+        elif len(ppl) == 1:  # in case of 1ppl
+            body_points_all_frame.append(ppl[0])
+        else:  # in case of 2ppl
+            left_ppl, right_ppl = ppl[0], ppl[1]
+            body_points_all_frame.append(left_ppl) if focus_2ppl == "left" else body_points_all_frame.append(
+                right_ppl)
+    return body_points_all_frame
 
 # spine tracking variation of get_body25s
 def get_body25s_spine_track(all_jsons, focus_2ppl="none"):
@@ -483,6 +507,99 @@ def prepare_test_data(data_path, test_video_name, side , file_path="test_feature
     np.savetxt(file_path, np.append(features, labels[:, np.newaxis], axis=1),delimiter=",")
 
 
+def prepare_data_4_class_dnn(data_path='./data/', file_path="dnn_features_4.csv"):
+
+    lines_video_list = open(data_path + "video_list.csv", "r").readlines()
+
+    features = []
+    labels = []
+    count = 0
+
+    for line_video_list in lines_video_list:  # for each video
+        # basic info
+        video_name = line_video_list.rstrip('\n').split(",")[0]
+        ppl_focus = line_video_list.rstrip('\n').split(",")[1]
+
+        # paths
+        path_frame_range = data_path + "frame_range/" + video_name + ".csv"
+        path_frame_jsons = data_path + "body_25/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+
+        # all frame jsons
+        all_json_files = []
+        for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+            for file in f:
+                if '.json' in file:
+                    all_json_files.append(os.path.join(r, file))
+        print("******")
+        print("Current Video: ", video_name)
+        lines_frame_range = open(path_frame_range, "r").readlines()
+
+        ranges_to_label = np.ones(len(all_json_files))
+        ranges_to_label *= 3
+
+        for line_frame_range in lines_frame_range:
+            # Find label for Each Frame
+            frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+            frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+            ranges_to_label[frame_start:frame_end + 1] = int(video_name[0])
+            print(frame_start, frame_end, int(video_name[0]))
+
+        lol = get_body25s(all_json_files, focus_2ppl=ppl_focus)
+        count += len(lol)
+        lol = centering(lol)
+        lol = normalize(lol)
+        for i in range(len(ranges_to_label)):
+            body_pt = get_body25_exclude_confidence(lol[i])
+            if (sum(body_pt) != 0):
+                features.append(body_pt)
+                labels.append(ranges_to_label[i])
+    features = np.array(features)
+    labels = np.array(labels)
+    print(count)
+    print(features.shape, labels.shape)
+    np.savetxt(file_path, np.append(features, labels[:, np.newaxis], axis=1),delimiter=",")
+
+
+def prepare_test_data_dnn(data_path, test_video_name, side, file_path="dnn_test_features_4.csv"):
+    features = []
+    labels = []
+
+    # path to get frame in jsons
+    path_frame_jsons = data_path + 'body_25/test/' + test_video_name + '/'
+    # path to get frame range labels
+    path_frame_range = data_path + 'frame_range/' + test_video_name + '.csv'
+    # get all frames' body 25
+    path_all_frame_jsons = []
+    for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+        for file in f:
+            if '.json' in file:
+                path_all_frame_jsons.append(os.path.join(r, file))
+    all_frame_jsons = get_body25s_spine_track(path_all_frame_jsons,focus_2ppl=side)
+    all_frame_jsons = centering(all_frame_jsons)
+    all_frame_jsons = np.array(all_frame_jsons)
+    all_frame_jsons = normalize(all_frame_jsons)
+
+    # pre label
+    lines_frame_range = open(path_frame_range, "r").readlines()
+    ranges_to_label = np.ones(len(all_frame_jsons))
+    ranges_to_label *= 3
+    for line_frame_range in lines_frame_range:
+        # Find label for Each Frame
+        frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+        frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+        action_label = int(line_frame_range.rstrip('\n').split(",")[2])
+        ranges_to_label[frame_start:frame_end + 1] = action_label
+        print(frame_start, frame_end, action_label)
+    # *********************************
+    for i in range(len(all_frame_jsons)):
+        body_pt = get_body25_exclude_confidence(all_frame_jsons[i])
+        features.append(body_pt)
+        labels.append(ranges_to_label[i])
+    features = np.array(features)
+    labels = np.array(labels)
+    print(features.shape, labels.shape)
+    np.savetxt(file_path, np.append(features, labels[:, np.newaxis], axis=1),delimiter=",")
+
 def prepare_data_4_classes(data_path="./data/", file_path="features_4.csv"):
     # data_path = './data/'
 
@@ -692,7 +809,9 @@ def prepare_data_4_classes_raw(data_path="./data/", file_path="features_4_raw.cs
 
 if __name__ == "__main__":
     # prepare_data("./data/")
-    prepare_test_data("./data/", "TestVideo", "right")
+    # prepare_test_data("./data/", "TestVideo", "right")
+    prepare_data_4_class_dnn()
+    prepare_test_data_dnn("./data/", "TestVideo", "right")
     # prepare_data_4_classes()
     # prepare_data_4_classes_raw()
     # prepare_data_as_figure("./data/")`
