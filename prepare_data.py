@@ -308,12 +308,20 @@ def centering(body_points_arrays):
 def normalize(body_points_arrays):
     ideal_neck_length = 50.0
     longest_neck = -1
+
+    necks = []
     for body_points_array in body_points_arrays:  # find the longest neck among all frames
         nose_x, nose_y = get_body25_specific(body_points_array, 0)
         neck_x, neck_y = get_body25_specific(body_points_array, 1)
         neck_length = distance(nose_x, nose_y, neck_x, neck_y)
-        if neck_length > longest_neck:
-            longest_neck = neck_length
+        #if neck_length > longest_neck:
+            #longest_neck = neck_length
+        necks.append(neck_length)
+    
+    necks = np.array(necks)
+    necks = necks[abs(necks-np.mean(necks)) < (2*np.std(necks))]
+    longest_neck = np.max(necks)
+
     ratio_to_divide = longest_neck / ideal_neck_length
 
     normalized = []
@@ -343,8 +351,8 @@ def normalize_range(keypoints):
     for idx in range(0, len(keypoints), 3):
         keypoints_ls.append([-keypoints[idx], -keypoints[idx + 1], keypoints[idx + 2]])
     keypoints_ls = np.array(keypoints_ls)
-    maxs = np.max(keypoints_ls, axis=0, keepdims=True)
-    mins = np.min(keypoints_ls, axis=0, keepdims=True)
+    #maxs = np.max(keypoints_ls, axis=0, keepdims=True)
+    #mins = np.min(keypoints_ls, axis=0, keepdims=True)
     #return (keypoints_ls - mins) / (maxs - mins)
     return keypoints_ls
 
@@ -401,11 +409,8 @@ def prepare_data(data_path):
             N, K, dim = points.shape
             # N = number of frames, K = num_body_points, dim = 3 points
 
-            window = 20
-            step = 5
-
-            for w in range(0, N, step):
-                current_window = points[w:w + window, :, :]  # [0:20,25,3]
+            for w in range(0, N, window_step):
+                current_window = points[w:w + window_size, :, :]  # [0:20,25,3]
                 current_features = np.zeros(K * n_feature_keypoint)
 
                 n, nx, ny = current_window.shape  # [0:20,25,3]
@@ -421,7 +426,7 @@ def prepare_data(data_path):
 
                     if point_time_series.shape[0] < 10:
                         # Just Leave features as Zeros for such keypoint
-                        break
+                        continue
 
                     # print(point_time_series.shape)
                     current_features[
@@ -445,7 +450,7 @@ def prepare_test_data(data_path, test_video_name, side , file_path="test_feature
     labels = []
 
     # path to get frame in jsons
-    path_frame_jsons = data_path + 'body_25/test/' + test_video_name + '/'
+    path_frame_jsons = data_path + '/' + test_video_name + '/'
     # path to get frame range labels
     path_frame_range = data_path + 'frame_range/' + test_video_name + '.csv'
     # get all frames' body 25
@@ -454,21 +459,16 @@ def prepare_test_data(data_path, test_video_name, side , file_path="test_feature
         for file in f:
             if '.json' in file:
                 path_all_frame_jsons.append(os.path.join(r, file))
+    
     all_frame_jsons = get_body25s_spine_track(path_all_frame_jsons,focus_2ppl=side)
     all_frame_jsons = centering(all_frame_jsons)
     all_frame_jsons = np.array(all_frame_jsons)
-    all_frame_jsons = normalize(all_frame_jsons)
-
-    points = []
-    for idx, lnl in enumerate(all_frame_jsons):
-        # plots( [lnl,all_frame_jsons[idx]] )
-        points.append(normalize_range(lnl))
-    points = np.array(points)
-
-    videos = []
+    #all_frame_jsons = normalize(all_frame_jsons)
+    
+    print("Checkpoint",len(all_frame_jsons))
     # pre label
     lines_frame_range = open(path_frame_range, "r").readlines()
-    ranges_to_label = np.ones(len(all_frame_jsons))
+    ranges_to_label = np.ones(len(path_all_frame_jsons))
     ranges_to_label *= 3
     for line_frame_range in lines_frame_range:
         # Find label for Each Frame
@@ -479,21 +479,27 @@ def prepare_test_data(data_path, test_video_name, side , file_path="test_feature
         print(frame_start, frame_end, action_label)
     # *********************************
 
-    for window_start_idx in range(0, len(all_frame_jsons) - window_size, window_step):
+    for window_start_idx in range(0, len(path_all_frame_jsons) - window_size, window_step):
 
         window_start_label = ranges_to_label[window_start_idx]
         window_end_label = ranges_to_label[window_start_idx + window_size - 1]
-
+        
         # if all label in the window equal to window start
         if np.all(ranges_to_label[window_start_idx:window_start_idx + window_size] == window_start_label):
             # print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
             labels.append(window_start_label)
-        elif window_start_label == window_end_label:  # if window start label = window end label
-            continue
+        #elif window_start_label == window_end_label:  # if window start label = window end label
+        #    continue
         else:
             labels.append(3)
+        
+        lol = all_frame_jsons[window_start_idx:window_start_idx + window_size]
+        points = []
 
-        curr_window_points = np.array(points[window_start_idx:window_start_idx + window_size, :, :])
+        for lnl in lol:
+            points.append(normalize_range(lnl))
+
+        curr_window_points = np.array(points)
         N, K, dim = curr_window_points.shape
         current_features = np.zeros(K * n_feature_keypoint)
         for i in range(K):
@@ -514,6 +520,40 @@ def prepare_test_data(data_path, test_video_name, side , file_path="test_feature
     print(features.shape, labels.shape)
     np.savetxt(file_path, np.append(features, labels[:, np.newaxis], axis=1),delimiter=",")
 
+def prepare_test_data_raw(data_path, test_video_name, side , file_path="test_raw_4.csv"):
+    features = []
+    labels = []
+
+    # path to get frame in jsons
+    path_frame_jsons = data_path + '/' + test_video_name + '/'
+    # path to get frame range labels
+    path_frame_range = data_path + 'frame_range/' + test_video_name + '.csv'
+    # get all frames' body 25
+    path_all_frame_jsons = []
+    for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+        for file in f:
+            if '.json' in file:
+                path_all_frame_jsons.append(os.path.join(r, file))
+    
+    all_frame_jsons = get_body25s_spine_track(path_all_frame_jsons,focus_2ppl=side)
+    all_frame_jsons = centering(all_frame_jsons)
+    all_frame_jsons = np.array(all_frame_jsons)
+    all_frame_jsons = normalize(all_frame_jsons)
+    
+    print("Checkpoint",len(all_frame_jsons))
+    # pre label
+    lines_frame_range = open(path_frame_range, "r").readlines()
+    ranges_to_label = np.ones(len(path_all_frame_jsons))
+    ranges_to_label *= 3
+    for line_frame_range in lines_frame_range:
+        # Find label for Each Frame
+        frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+        frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+        action_label = int(line_frame_range.rstrip('\n').split(",")[2])
+        ranges_to_label[frame_start:frame_end + 1] = action_label
+        print(frame_start, frame_end, action_label)
+        plots([all_frame_jsons[frame_start]])
+    # *********************************
 
 def prepare_data_4_class_dnn(data_path='./data/', file_path="dnn_features_4.csv"):
 
@@ -789,8 +829,6 @@ def prepare_data_4_classes_raw(data_path="./data/", file_path="features_4_raw.cs
             if np.all(ranges_to_label[window_start_idx:window_start_idx + window_size] == window_start_label):
                 # print(window_start_idx,ranges_to_label[window_start_idx:window_start_idx+window_size])
                 current_label = window_start_label
-            elif window_start_label == window_end_label:
-                continue
 
             action_frames = all_json_files[window_start_idx:window_start_idx + window_size]
 
@@ -815,13 +853,151 @@ def prepare_data_4_classes_raw(data_path="./data/", file_path="features_4_raw.cs
     np.savetxt(file_path, np.append(np.append(features, labels[:, np.newaxis], axis=1), videos[:, np.newaxis], axis=1),
                delimiter=",")
 
+def prepare_data_scorer(data_path="./data/",file_path="features_4_score.csv"):
+    # data_path = './data/'
 
+    lines_video_list = open(data_path + "video_list.csv", "r").readlines()
+    videos = [line_video_list.rstrip('\n').split(",")[0] for line_video_list in lines_video_list]
+
+    features = []
+    labels = []
+    videos = []
+    for line_video_list in lines_video_list:  # for each video
+        # basic info
+        video_name = line_video_list.rstrip('\n').split(",")[0]
+        ppl_focus = line_video_list.rstrip('\n').split(",")[1]
+
+        # paths
+        path_frame_range = data_path + "frame_range/" + video_name + ".csv"
+        path_frame_jsons = data_path + "body_25/" + ("1ppl/" if ppl_focus == "none" else "2ppl/") + video_name
+
+        # all frame jsons
+        all_json_files = []
+        for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+            for file in f:
+                if '.json' in file:
+                    all_json_files.append(os.path.join(r, file))
+        print("******")
+        print("Current Video: ", video_name)
+        lines_frame_range = open(path_frame_range, "r").readlines()
+
+        for line_frame_range in lines_frame_range:  # for each action (frame range)
+
+            frame_start = int(line_frame_range.rstrip('\n').split(",")[0])
+            frame_end = int(line_frame_range.rstrip('\n').split(",")[1])
+            print("frame start: ", frame_start, " - frame_end: ", frame_end)
+            action_frames = []
+            for curr_json in all_json_files:
+                if int(frame_start) <= int(curr_json.split("_")[-2]) <= int(frame_end):
+                    action_frames.append(curr_json)
+            # FOR EACH FRAME, DO SOMETHING
+            lol = get_body25s(action_frames, focus_2ppl=ppl_focus)
+            print("lol length: ", len(lol))
+            lol = centering(lol)
+            #old_lol = np.array(lol)
+            lol = normalize(lol)
+
+            
+            points = []
+            for  percentange in range(0,101,20):
+                idx = (len(lol)-1) * percentange / 100
+                idx = int(idx)
+                print(idx)
+                points.append(normalize_range(lol[idx]))
+            points = np.array(points)
+            print(points.shape)
+            # N = number of frames, K = num_body_points, dim = 3 points
+
+            current_window = points # [0:20,25,3]
+            K = points.shape[1]
+            current_features = np.zeros(K * n_feature_keypoint)
+
+            n, nx, ny = current_window.shape  # [0:20,25,3]
+            if n < 3:  # less than 10 frames in the window
+                break
+
+            for i in range(K):
+                # Get Specific points over the Window
+                point_time_series = current_window[:, i, :].reshape(n, ny)
+                # Remove Invalid points and Drop Probability
+                point_time_series = point_time_series[point_time_series[:, 2] > 0]
+                point_time_series = point_time_series[:, 0:2]
+
+                if point_time_series.shape[0] < 3:
+                    # Just Leave features as Zeros for such keypoint
+                    continue
+
+                # print(point_time_series.shape)
+                current_features[
+                i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
+                    point_time_series)
+
+            features.append(current_features)
+            labels.append(int(video_name[0]))
+            videos.append(int(video_name[0:3]))
+
+
+    features = np.array(features)
+    labels = np.array(labels)
+    videos = np.array(videos)
+    print(features.shape, labels.shape, videos.shape)
+    np.savetxt(file_path,
+               np.append(np.append(features, labels[:, np.newaxis], axis=1), videos[:, np.newaxis], axis=1),
+               delimiter=",")
+
+def read_all_frames(data_path,test_video_name,side):
+    features = []
+    labels = []
+
+    # path to get frame in jsons
+    path_frame_jsons = data_path + '/' + test_video_name + '/'
+    # path to get frame range labels
+    path_frame_range = data_path + 'frame_range/' + test_video_name + '.csv'
+    # get all frames' body 25
+    path_all_frame_jsons = []
+    for r, d, f in os.walk(path_frame_jsons):  # r=root, d=directories, f = files
+        for file in f:
+            if '.json' in file:
+                path_all_frame_jsons.append(os.path.join(r, file))
+    
+    all_frame_jsons = get_body25s_spine_track(path_all_frame_jsons,focus_2ppl=side)
+    all_frame_jsons = centering(all_frame_jsons)
+    all_frame_jsons = np.array(all_frame_jsons)
+    #all_frame_jsons = normalize(all_frame_jsons)
+    
+    return all_frame_jsons
+    
+def feature_extraction_wrapper(frames_raw):        
+    lol = frames_raw
+    points = []
+    for lnl in lol:
+        points.append(normalize_range(lnl))
+
+    curr_window_points = np.array(points)
+    N, K, dim = curr_window_points.shape
+    current_features = np.zeros(K * n_feature_keypoint)
+    for i in range(K):
+        # Get Specific points over the Window
+        n, nx, ny = curr_window_points.shape
+        point_time_series = curr_window_points[:, i, :].reshape(n, ny)
+        # Remove Invalid points and Drop Probability
+        point_time_series = point_time_series[point_time_series[:, 2] > 0]
+        point_time_series = point_time_series[:, 0:2]
+        if point_time_series.shape[0] < 10:
+            break
+        current_features[
+        i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
+            point_time_series)
+    return current_features
+    
 if __name__ == "__main__":
     # prepare_data("./data/")
     # prepare_test_data("./data/", "TestVideo", "right")
-    prepare_data_4_class_dnn()
-    prepare_test_data_dnn("./data/", "TestVideo", "right")
+    #prepare_data_4_class_dnn()
+    #prepare_test_data_dnn("./data/", "TestVideo", "right")
     # prepare_data_4_classes()
     # prepare_data_4_classes_raw()
     #prepare_data_as_figure("./data/")
-    pass
+    #prepare_test_data_raw("./data/", "TestVideo", "right")
+    prepare_data_scorer()
+    #pass

@@ -3,15 +3,15 @@ from numpy import genfromtxt
 import matplotlib.pyplot as plt
 
 data = genfromtxt('../features.csv', delimiter=',')
-data[np.isnan(data)] = 0
-data[np.isinf(data)] = 0
+#data[np.isnan(data)] = 0
+#data[np.isinf(data)] = 0
 for i in range(data.shape[1]):
     n_feature = 23
     keypoint = i//n_feature
     features_number = i%n_feature
     #Get Specific Features
     #if features_number == 8:
-    if features_number==8 or features_number==13 or features_number==18:
+    if i == 35:
         features_1 = data[data[:,-1] == 0,i]
         features_2 = data[data[:,-1] == 1,i]
         features_3 = data[data[:,-1] == 2,i]

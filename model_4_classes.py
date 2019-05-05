@@ -3,7 +3,7 @@ from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-from prepare_data import prepare_data_4_classes
+from prepare_data import prepare_data_4_classes,prepare_data_4_classes_raw
 from numpy import genfromtxt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
@@ -14,8 +14,10 @@ from sklearn.feature_selection import chi2,f_classif,mutual_info_classif
 
 np.random.seed(seed=42)
 
-prepare_data_4_classes()
+#prepare_data_4_classes()
 data = genfromtxt('features_4.csv', delimiter=',')
+#prepare_data_4_classes_raw()
+#data = genfromtxt('features_4_raw.csv',delimiter=',')
 X, y, S = data[:, :-2], data[:, -2], data[:,-1]
 X[np.isnan(X)] = 0
 X[np.isinf(X)] = 0
@@ -24,7 +26,7 @@ print(np.unique(S))
 print(y[(y==0)].shape,y[(y==1)].shape,y[(y==2)].shape,y[(y==3)].shape)
 
 
-X = SelectPercentile(f_classif, percentile=15).fit_transform(X, y)
+#X = SelectPercentile(f_classif, percentile=10).fit_transform(X, y)
 #print(X.shape)
 
 avgs_precision = []
@@ -85,9 +87,9 @@ for forehand in [1,3,4,5]:
             target_names = ['class 0', 'class 1', 'class 2','class 3']
             scores = classification_report(y_test, y_pred, labels=[0,1,2,3], target_names=target_names,output_dict=True)
             #print(classification_report(y_test, y_pred, labels=[0,1,2,3], target_names=target_names))
-            avgs_precision.append(scores["micro avg"]["precision"])
-            avgs_recall.append(scores["micro avg"]["recall"])
-            avgs_f1.append(scores["micro avg"]["f1-score"])
+            avgs_precision.append(scores["macro avg"]["precision"])
+            avgs_recall.append(scores["macro avg"]["recall"])
+            avgs_f1.append(scores["macro avg"]["f1-score"])
             cm += confusion_matrix(y_test,y_pred)
             counter += 1
             #avgs.append(accuracy_score(y_test, y_pred))
@@ -98,4 +100,4 @@ avgs_f1 = np.array(avgs_f1)
 
 print(np.mean(avgs_precision),np.mean(avgs_recall),np.mean(avgs_f1))
 print(cm/counter)
-#print(features_imp.argsort()[-50:][::-1])
+print(features_imp.argsort())

@@ -8,7 +8,8 @@ from numpy import genfromtxt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from sklearn.metrics import accuracy_score, confusion_matrix
-
+from sklearn.feature_selection import SelectKBest,SelectPercentile
+from sklearn.feature_selection import chi2,f_classif,mutual_info_classif
 '''
 #####################################################################
 Dont Train with Class 3 (Not an action)
@@ -24,8 +25,10 @@ np.random.seed(seed=42)
 data = genfromtxt('features_subject.csv', delimiter=',')
 X, y, S = data[:, :-2], data[:, -2], data[:,-1]
 
+
 data = genfromtxt('features_4.csv', delimiter=',')
 X_4, y_4, S_4 = data[:, :-2], data[:, -2], data[:,-1]
+
 
 X[np.isnan(X)] = 0
 X[np.isinf(X)] = 0
@@ -40,6 +43,11 @@ avgs_recall = []
 avgs_f1 = []
 print(y[(y==0)].shape,y[(y==1)].shape,y[(y==2)].shape)
 cm = np.zeros((4,4))
+
+sf = SelectPercentile(f_classif, percentile=10).fit(X, y)
+X = sf.transform(X)
+X_4 = sf.transform(X_4)
+
 for forehand in [1,3,4,5]:
     for backhand in [101,102,103,104,105]:
         for smash in [201,202,203,204]:
@@ -76,16 +84,25 @@ for forehand in [1,3,4,5]:
             y_pred=clf.predict(X_test)
             """
 
-            y_pred = clf.predict_proba(X_test)
-            y_pred_mask = np.max(y_pred,axis=1) < 0.5
-            y_pred = np.argmax(y_pred,axis=1)
-            y_pred[y_pred_mask] = 3
+            y_pred_scores = clf.predict_proba(X_test)
+            #y_pred_mask = np.max(y_pred,axis=1) < 0.5
+            #y_pred = np.argmax(y_pred,axis=1)
+            #y_pred[y_pred_mask] = 3
             #print(np.sum(y_pred_mask))
+            y_pred = np.ones(X_test.shape[0])
+            y_pred *= 3
+
+            for i in range(1,len(y_pred)):
+                if np.max(y_pred[i]) > 0.4:
+                    y_pred[i] = np.argmax(y_pred_scores[i])
+                if y_pred[i] != y_pred[i-1] and y_pred[i-1]!=3:
+                    y_pred[i] = 3
+
             target_names = ['class 0', 'class 1', 'class 2','class 3']
             scores = classification_report(y_test, y_pred, labels=[0,1,2,3], target_names=target_names,output_dict=True)
-            avgs_precision.append(scores["micro avg"]["precision"])
-            avgs_recall.append(scores["micro avg"]["recall"])
-            avgs_f1.append(scores["micro avg"]["f1-score"])
+            avgs_precision.append(scores["macro avg"]["precision"])
+            avgs_recall.append(scores["macro avg"]["recall"])
+            avgs_f1.append(scores["macro avg"]["f1-score"])
             cm += confusion_matrix(y_test,y_pred)
             #avgs.append(accuracy_score(y_test, y_pred))
             #print(accuracy_score(y_test, y_pred))
