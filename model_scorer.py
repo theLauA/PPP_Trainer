@@ -18,14 +18,17 @@ print(X.shape,y.shape,S.shape)
 print(np.unique(S))
 print(y[(y==0)].shape,y[(y==1)].shape,y[(y==2)].shape,y[(y==3)].shape)
 
-
 for i in [0,1,2]:
+    
+    y_preds = []
+    y_tests = []
+
     X_r = X.copy()
     y_r = y.copy()
 
     y_r[y==i] = 100
     y_r[y!=i] = 0 
-    '''
+    
     for forehand in [1,3,4,5]:
         for backhand in [101,102,103,104,105]:
             for smash in [201,202,203,204]:
@@ -38,10 +41,14 @@ for i in [0,1,2]:
                 clf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=0)
                 clf = clf.fit(X_train,y_train)
                 y_pred=clf.predict(X_test)
-
-                print(y_pred,y_test)
-    '''
+                
+                y_preds = np.append(y_preds,y_pred)
+                y_tests = np.append(y_tests,y_test)
+                #print(y_pred,y_test)
+    
     #Save Scorer
-    clf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=0)
-    clf = clf.fit(X_r,y_r)
-    pickle.dump(clf,open("scorer_class_"+str(i),"wb"))
+    #clf = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=0)
+    #clf = clf.fit(X_r,y_r)
+    #pickle.dump(clf,open("scorer_class_"+str(i),"wb"))
+
+    print(i,  np.mean(np.sqrt((y_preds-y_tests)**2) ) )

@@ -14,6 +14,9 @@ from sklearn.feature_selection import chi2,f_classif,mutual_info_classif
 
 np.random.seed(seed=42)
 
+
+# Train with Full Video
+
 #prepare_data_4_classes()
 data = genfromtxt('features_4.csv', delimiter=',')
 #prepare_data_4_classes_raw()
@@ -25,9 +28,6 @@ print(X.shape,y.shape,S.shape)
 print(np.unique(S))
 print(y[(y==0)].shape,y[(y==1)].shape,y[(y==2)].shape,y[(y==3)].shape)
 
-
-#X = SelectPercentile(f_classif, percentile=10).fit_transform(X, y)
-#print(X.shape)
 
 avgs_precision = []
 avgs_recall = []

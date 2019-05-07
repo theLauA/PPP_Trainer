@@ -5,7 +5,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-from features import _extract_features_
+from features import _extract_features_, _extract_features_two_
 from matplotlib import colors as mcolors
 
 n_feature_keypoint = 23
@@ -432,7 +432,16 @@ def prepare_data(data_path):
                     current_features[
                     i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
                         point_time_series)
-
+                # Features when tracking two points over time
+                
+                # Point 0
+                p0s = current_window[:,0,:].reshape(n, ny)
+                p4s = current_window[:,4,:].reshape(n, ny)
+                # Check if both points are valid
+                mask_0 = p0s[:,2]>0
+                mask_4 = p4s[:,2]>0
+                mask = mask_0 == mask_4
+                current_features = np.append(current_features,_extract_features_two_(p0s[mask,0:2],p4s[mask,0:2]))
                 features.append(current_features)
                 labels.append(int(video_name[0]))
                 videos.append(int(video_name[0:3]))
@@ -494,26 +503,9 @@ def prepare_test_data(data_path, test_video_name, side , file_path="test_feature
             labels.append(3)
         
         lol = all_frame_jsons[window_start_idx:window_start_idx + window_size]
-        points = []
+        
+        current_features = feature_extraction_wrapper(lol)
 
-        for lnl in lol:
-            points.append(normalize_range(lnl))
-
-        curr_window_points = np.array(points)
-        N, K, dim = curr_window_points.shape
-        current_features = np.zeros(K * n_feature_keypoint)
-        for i in range(K):
-            # Get Specific points over the Window
-            n, nx, ny = curr_window_points.shape
-            point_time_series = curr_window_points[:, i, :].reshape(n, ny)
-            # Remove Invalid points and Drop Probability
-            point_time_series = point_time_series[point_time_series[:, 2] > 0]
-            point_time_series = point_time_series[:, 0:2]
-            if point_time_series.shape[0] < 10:
-                break
-            current_features[
-            i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
-                point_time_series)
         features.append(current_features)
     features = np.array(features)
     labels = np.array(labels)
@@ -705,24 +697,8 @@ def prepare_data_4_classes(data_path="./data/", file_path="features_4.csv"):
             lol = centering(lol)
             lol = normalize(lol)
 
-            points = []
-            for lnl in lol:
-                points.append(normalize_range(lnl))
-            curr_window_points = np.array(points)
-            N, K, dim = curr_window_points.shape
-            current_features = np.zeros(K * n_feature_keypoint)
-            for i in range(K):
-                # Get Specific points over the Window
-                n, nx, ny = curr_window_points.shape
-                point_time_series = curr_window_points[:, i, :].reshape(n, ny)
-                # Remove Invalid points and Drop Probability
-                point_time_series = point_time_series[point_time_series[:, 2] > 0]
-                point_time_series = point_time_series[:, 0:2]
-                if point_time_series.shape[0] < 10:
-                    break
-                current_features[
-                i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
-                    point_time_series)
+            current_features = feature_extraction_wrapper(lol)
+            
             features.append(current_features)
             videos.append(int(video_name[0:3]))
     features = np.array(features)
@@ -988,6 +964,22 @@ def feature_extraction_wrapper(frames_raw):
         current_features[
         i * n_feature_keypoint:i * n_feature_keypoint + n_feature_keypoint] = _extract_features_(
             point_time_series)
+
+    # Features when tracking two points over time
+    
+    # Point 0
+    p0s = curr_window_points[:,0,:].reshape(n, ny)
+    p4s = curr_window_points[:,4,:].reshape(n, ny)
+    # Check if both points are valid
+    mask_0 = p0s[:,2]>0
+    mask_4 = p4s[:,2]>0
+    mask = mask_0 == mask_4
+    if len(p0s[mask,0:2]) >= 5:
+        #current_features = np.append(current_features,_extract_features_two_(p0s[mask,0:2],p4s[mask,0:2]))
+        pass
+    else:
+        #current_features = np.append(current_features,np.zeros(15))
+        pass
     return current_features
     
 if __name__ == "__main__":

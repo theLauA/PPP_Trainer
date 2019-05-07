@@ -27,6 +27,7 @@ def _median_(points):
     return np.median(points,axis=0)
 
 def _regress_(points):
+    points -= points[0,:]
     slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(range(len(points)),points[:,1])
     slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(range(len(points)),points[:,0])
     slope, intercept, r_value, p_value, std_err = linregress(points[:,1],points[:,0])
@@ -35,3 +36,8 @@ def _regress_(points):
                     slope_x, intercept_x, r_value_x, p_value_x, std_err_x,
                     slope, intercept, r_value, p_value, std_err])
 
+def _extract_features_two_(points_1,points_2):
+
+    dists = points_1 - points_2
+
+    return _regress_(dists)
