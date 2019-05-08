@@ -20,3 +20,6 @@ Model Train with Clips of Valid Actions; and Test
 
 `prepare_data.py` \ 
 `prepare_data_4_classes` to read in all json OpenPose output in `.\data`, perform windowing and feature selections, save results as `.csv`
+
+# Data
+https://umass.box.com/s/rtqvadr62phjdivecx8vhe56w19tiihy
